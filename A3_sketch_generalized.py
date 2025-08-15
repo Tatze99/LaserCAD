@@ -388,7 +388,7 @@ LiMgAS_crystal1.pos += (1,0,0)
 LiMgAS_crystal2 = Cylindric_Crystal(name="LiMgAs2", aperture=15, thickness=11)
 LiMgAS_crystal2.pos += (-12, 0, 0)
 
-if freecad_da:
+if freecad_da and __name__ == "__main__":
     clear_doc()
     Setup.draw()
     Pump_top.draw()
