@@ -90,12 +90,12 @@ Comp2 = Composition(name="PM19 bot")
 Comp2.set_light_source(beam2)
 Comp2.pos -= (pump_module_xoffset,pump_module_separation,0)
 
-Laser_Head_in = Component(name="Pump Module PM19 bot")
+Laser_Head_in = Component(name="laser Pump Module PM19 bot")
 stl_file = rf"{thisfolder}\misc_meshes\PM19_2.stl"
 Laser_Head_in.draw_dict["stl_file"]=stl_file
 Laser_Head_in.freecad_model = load_STL
 
-Laser_Head_out = Component(name="Pump Module PM19 top")
+Laser_Head_out = Component(name="laser Pump Module PM19 top")
 stl_file = rf"{thisfolder}\misc_meshes\PM19_2.stl"
 Laser_Head_out.draw_dict["stl_file"]=stl_file
 Laser_Head_out.freecad_model = load_STL
@@ -182,7 +182,7 @@ beam.draw_dict["color"] = (0.0,1.0,0.0)
 
 Laser = LaserPointer(name="Laser Pointer 1")
 Camera1 = Camera(name="Camera 1")
-M1 = Newport_Mirror(name="pump mirror 1", phi=180+50, aperture=25.4) # pump mirror 1
+M1 = Newport_Mirror(name="M1", phi=180+50, aperture=25.4) # pump mirror 1
 M1.set_mount(Adapter_1inch(angle=180))
 M2 = Newport_Mirror(name="M2", phi=180-50-angle_of_incidence, aperture=2*25.4)
 M3 = Newport_Mirror(name="M3", phi=-90)
@@ -260,11 +260,13 @@ if freecad_da:
     setview()
 
 else:
-    print_post_positions(Comp)
-    print_post_positions(Comp2)
-    print_post_positions(Setup)
-    print_post_positions(Setup2)
+    # print_post_positions(Comp)
+    # print_post_positions(Comp2)
+    # print_post_positions(Setup)
+    # print_post_positions(Setup2)
 
-    # export_to_TikZ(Comp, draw_beams=True, beam_color="optikzred")
-    # export_to_TikZ(Comp2, draw_beams=True, beam_color="optikzred")
-    # export_to_TikZ(Setup, draw_rays=True, beam_color="green")
+    # print(Comp._elements, Comp.non_opticals)
+    export_to_TikZ(Comp, draw_beams=True, beam_color="optikzred")
+    export_to_TikZ(Comp2, draw_beams=True, beam_color="optikzred")
+    export_to_TikZ(Setup, draw_beams=True, beam_color="green")
+    export_to_TikZ(Setup2, draw_beams=True, beam_color="green")

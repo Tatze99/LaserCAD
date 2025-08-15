@@ -316,12 +316,12 @@ Pump_bot = Composition(name="PM19 bot")
 Pump_bot.set_light_source(beam2)
 Pump_bot.pos -= (pump_module_xoffset,pump_module_separation,0)
 
-Laser_Head_in = Component(name="Pump Module PM19 bot")
+Laser_Head_in = Component(name="laser Pump Module PM19 bot")
 stl_file = rf"{thisfolder}\misc_meshes\PM19_2.stl"
 Laser_Head_in.draw_dict["stl_file"]=stl_file
 Laser_Head_in.freecad_model = load_STL
 
-Laser_Head_out = Component(name="Pump Module PM19 top")
+Laser_Head_out = Component(name="laser Pump Module PM19 top")
 stl_file = rf"{thisfolder}\misc_meshes\PM19_2.stl"
 Laser_Head_out.draw_dict["stl_file"]=stl_file
 Laser_Head_out.freecad_model = load_STL
