@@ -45,7 +45,7 @@ def get_TFP_distances(TFP_ydist, TFP_angle):
     return TFP_dist, TFP_xdist, TFP_delta, TFP_Lam, Lam_PC, PC_TFP
 
 rotate_axis = np.pi
-offset_axis = (950+110-15,500,20)
+offset_axis = (950+110-15,500-60,20)
 
 class Newport_Mirror(Mirror):
     def __init__(self, name="Newport Mirror", aperture=25.4, **kwargs):
@@ -66,6 +66,8 @@ class Newport_Curved_Mirror(Curved_Mirror):
             self.set_mount(Composed_Mount(unit_model_list=["U100-A2K", "1inch_post"]))
         elif self.aperture == 2*25.4:
             self.set_mount(Composed_Mount(unit_model_list=["U200-A2K", "1inch_post"]))
+        elif self.aperture == 3*25.4:
+            self.set_mount(Composed_Mount(unit_model_list=["U300-A2K", "1inch_post"]))
 
 class Table(Crystal):
     def __init__(self, name="Table", width=1000, height=10, thickness=1000, **kwargs):
@@ -208,7 +210,7 @@ M1 = Newport_Mirror(name="M1, cut mirror 1", phi=-pump_angle-tele_angle1) # cut 
 
 M4 = Newport_Mirror(name="M4, mirror after tfp 2", phi=pump_angle) # mirror after TFP2
 R1 = Newport_Curved_Mirror(name=f"R1, f={f1:.0f}mm", phi=-180+tele_angle1, radius=r1)
-R2 = Newport_Curved_Mirror(name=f"R1, f={f2:.0f}mm", phi=-180+tele_angle2, radius=r2)
+R2 = Newport_Curved_Mirror(name=f"R2, f={f2:.0f}mm", phi=-180+tele_angle2, radius=r2, aperture=25.4*3)
 TFP1 = Newport_Mirror(name="TFP1 (Input)", phi=-90+deg(TFP_angle), aperture=25.4*2)
 TFP2 = Newport_Mirror(name="TFP2 (Output)", phi=90-deg(TFP_angle), aperture=25.4*2)
 pockels_cell = Pockels_Cell(name="Pockels Cell", mount_name="Pockels_cell")
@@ -279,13 +281,14 @@ M3.Mount.mount_list[0].flip(90)
 Pump Setup
 #####################################
 """
-pump_magnification = 0.45  
-max_pump_power = 15.7 # kW
+pump_magnification = 0.42  
+max_pump_power = 14 # kW
 pump_spot_size = 15 # mm
 final_pump_area = 1e-2*(pump_magnification*pump_spot_size)**2 # cm^2
 
 focal_length1 = 75 # 125
 focal_length2 = 200
+lasermedia_dist = 20 # distance from the image planes of the two laser media
 
 object_distance = focal_length1 * (1 + 1/pump_magnification)
 image_distance = focal_length1 * (1 + pump_magnification)
@@ -296,7 +299,8 @@ print(f"pump intensity = {max_pump_power/final_pump_area:.1f}kW/cm²\n")
 image_plane_to_pump_module_distance = 65
 
 pump_module_separation = 300
-pump_module_xoffset = object_distance + image_plane_to_pump_module_distance + image_distance
+pump_module_top_xoffset = object_distance + image_plane_to_pump_module_distance + image_distance + lasermedia_dist/2
+pump_module_bot_xoffset = pump_module_top_xoffset - lasermedia_dist
 pump_module_lens_dist = object_distance + image_plane_to_pump_module_distance
 
 distance_lens_to_mirror = (2*focal_length2-pump_module_separation)/2
@@ -309,12 +313,12 @@ beam2.draw_dict["color"] = (255/256,255/256,0.0)
 
 Pump_top = Composition(name="PM19 top")
 Pump_top.set_light_source(beam1)
-Pump_top.pos -= (pump_module_xoffset,0,0)
+Pump_top.pos -= (pump_module_top_xoffset,0,0)
 
 
 Pump_bot = Composition(name="PM19 bot")
 Pump_bot.set_light_source(beam2)
-Pump_bot.pos -= (pump_module_xoffset,pump_module_separation,0)
+Pump_bot.pos -= (pump_module_bot_xoffset,pump_module_separation,0)
 
 Laser_Head_in = Component(name="laser Pump Module PM19 bot")
 stl_file = rf"{thisfolder}\misc_meshes\PM19_2.stl"
@@ -325,6 +329,16 @@ Laser_Head_out = Component(name="laser Pump Module PM19 top")
 stl_file = rf"{thisfolder}\misc_meshes\PM19_2.stl"
 Laser_Head_out.draw_dict["stl_file"]=stl_file
 Laser_Head_out.freecad_model = load_STL
+
+Kuehlmount_Alumosilikatglas = Component(name="Kuehlmount Alumosilikatglas d23")
+stl_file = rf"{thisfolder}\misc_meshes\Kuehlmount_Alumosilikatglas_d23.stl"
+Kuehlmount_Alumosilikatglas.draw_dict["stl_file"]=stl_file
+Kuehlmount_Alumosilikatglas.freecad_model = load_STL
+
+Kuehlmount2_Alumosilikatglas = Component(name="Kuehlmount Alumosilikatglas d23")
+stl_file = rf"{thisfolder}\misc_meshes\Kuehlmount_Alumosilikatglas_d23.stl"
+Kuehlmount2_Alumosilikatglas.draw_dict["stl_file"]=stl_file
+Kuehlmount2_Alumosilikatglas.freecad_model = load_STL
 
 lens1 = Lens(f=focal_length1, name=f"Pump Lens 1, f={focal_length1}mm")
 lens1.aperture = 25.4*2
@@ -348,7 +362,8 @@ print(f"PM19 top position = ({Pump_top.pos[0]/10:.1f}cm, {Pump_top.pos[1]/10:.1f
 Pump_top.add_on_axis(Laser_Head_in)
 Pump_top.propagate(pump_module_lens_dist)
 Pump_top.add_on_axis(lens1)
-Pump_top.propagate(image_distance)
+Pump_top.propagate(image_distance-6)
+Pump_top.add_on_axis(Kuehlmount_Alumosilikatglas)
 
 Pump_bot.pos += offset_axis
 print(f"PM19 bot position = ({Pump_bot.pos[0]/10:.1f}cm, {Pump_bot.pos[1]/10:.1f}cm, {Pump_bot.pos[2]/10:.1f}cm)\n")
@@ -364,7 +379,8 @@ Pump_bot.propagate(pump_module_separation)
 Pump_bot.add_on_axis(M3_1)
 Pump_bot.propagate(distance_lens_to_mirror)
 Pump_bot.add_on_axis(lens2)
-Pump_bot.propagate(focal_length2)
+Pump_bot.propagate(focal_length2-6)
+Pump_bot.add_on_axis(Kuehlmount2_Alumosilikatglas)
 
 table = Table(name="Right Table", width=900, height=10, thickness=1500)
 table.pos = (0,450,-5)
@@ -395,8 +411,8 @@ if freecad_da and __name__ == "__main__":
     Pump_bot.draw()
     table.draw()
     table2.draw()
-    Housing.draw()
-    Housing2.draw()
+    # Housing.draw()
+    # Housing2.draw()
     LiMgAS_crystal2.draw()
     LiMgAS_crystal1.draw()
     # setview()
