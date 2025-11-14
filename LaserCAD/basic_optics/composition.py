@@ -672,7 +672,7 @@ def print_post_positions(Composition, max_tabs = 5):
     post_positions = Composition.post_positions(verbose=True, print_errors=False)
     for post, position in post_positions:
         padd = "\t" * max(1, max_tabs- len(post) // 8)
-        print(f"name = {post},{padd} post position = ({position[0]/10:.1f}cm,{position[1]/10:.1f}cm)")
+        print(f"{post},{padd} post position = ({position[0]/10:.1f}cm,{position[1]/10:.1f}cm)")
     
     return post_positions
 
