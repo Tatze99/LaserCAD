@@ -8,6 +8,9 @@ Created on Sun Aug 21 20:28:02 2022
 
 from ..freecad_models import model_lens, lens_mount
 from .optical_element import Opt_Element
+from .constants import inch
+import numpy as np
+from copy import deepcopy
 
 
 class Lens(Opt_Element):
@@ -43,6 +46,155 @@ class Lens(Opt_Element):
     return txt
 
 
+class Thicklens(Opt_Element):
+  def __init__(self, f=100, n=1.5, name="NewLens", aperture=1*inch, biconvex=False, thickness=24.2, **kwargs):
+    super().__init__(name=name, **kwargs)
+    self.focal_length = f
+    self.thickness = thickness
+    self.aperture = aperture
+    self.freecad_model = model_lens
+    self.refractive_index = n
+    self.biconvex = biconvex
+
+  def set_mount_to_default(self):
+    super().set_mount_to_default()
+    self.Mount.pos += self.normal * (self.thickness - 8)
+
+
+  @property
+  def focal_length(self):
+    return self.__f
+  @focal_length.setter
+  def focal_length(self, x):
+    self.__f = x
+    if x == 0:
+      self._matrix[1,0] = 0
+    else:
+      self._matrix[1,0] = -1/x
+
+  def radius1(self):
+    f = self.focal_length
+    d = self.thickness
+    n = self.refractive_index
+    if not self.biconvex:
+      return (n-1)*f
+    else:
+      return (n-1)*(f+np.sqrt(f**2-f*d/n))
+    
+  def radius2(self):
+    if not self.biconvex:
+      return 0
+    else:
+      return -self.radius1()
+  
+  def intersection_S1(self, ray):
+    """
+    ermittelt den Schnittpunkt vom Strahl mit einer Spähre, die durch
+    <center> € R^3 und <radius> € R definiert ist
+    und setzt seine Länge auf den Abstand self.pos--element.pos (bedenken!)
+    siehe Springer Handbook of Lasers and Optics Seite 66 f
+
+    Parameters
+    ----------
+    center : TYPE 3D-array
+      Mittelpunkt der Sphäre
+
+    radius : TYPE float
+      Radius der Sphäre; >0 für konkave Spiegel (Fokus), <0 für konvexe
+
+    Returns
+    -------
+    endpoint : TYPE 3D-array
+    """
+    radius = -self.radius1()
+    diffvec = self.pos - radius*self.normal - ray.pos
+    k = np.sum( diffvec * ray.normal )
+    w = np.sqrt(k**2 - np.sum(diffvec**2) + radius**2)
+    s1 = k + w
+    s2 = k - w
+    #Fallunterscheidung
+    if radius < 0 and s2 > 0:
+      dist = s2
+    else:
+      dist = s1
+    ray.length = dist
+    endpoint = ray.endpoint()
+    return endpoint
+  
+  def intersection_S2(self, ray):
+    """
+    Calculates the intersection point of the ray with a plane given by a 
+    Geom_Object (e.g a thin lens).
+
+    Parameters
+    ----------
+    element : Geom_Object
+      Element in the intersection plane.
+    set_length : optional
+      Sets the length of the ray so that it end on the object plane if true. 
+      The default is True.
+
+    Returns
+    -------
+    endpoint
+    """
+    C = self.pos + self.normal * self.thickness
+    n_z = self.normal 
+    a = ray.normal
+    p = ray.pos
+
+    s0 = np.sum((C-p)*n_z) / np.sum(a*n_z)
+    ray.length = s0
+    endpoint = ray.endpoint()
+    
+    return endpoint
+  
+  
+  def next_ray(self, ray):
+    mid_ray = self.refraction1(ray)
+    out_ray = self.refraction2(mid_ray)
+
+    return out_ray
+  
+  def refraction1(self, ray):
+    # See Springer Handbook of Lasers and Optics page 68
+    ray2 = deepcopy(ray)
+    ray2.pos = self.intersection_S1(ray)
+    N = ray2.pos - (self.pos + self.normal * self.thickness)
+    N = N / np.linalg.norm(N)
+    a1 = ray.normal
+    n1n2 = 1/self.refractive_index
+    a2 = n1n2* a1 - n1n2*np.sum(a1*N)* N + np.sqrt(1 - n1n2**2*(1 - np.sum(a1*N)**2))* N
+    if np.sign(np.sum(a1*N)) != np.sign(np.sum(a2*N)):
+      a2 = n1n2* a1 - n1n2*np.sum(a1*N)* N - np.sqrt(1 - n1n2**2*(1 - np.sum(a1*N)**2))* N
+    ray2.normal = a2
+    return ray2
+  
+  def refraction2(self, ray):
+    # See Springer Handbook of Lasers and Optics page 68
+    ray2 = deepcopy(ray)
+    ray2.pos = self.intersection_S2(ray)
+    N = self.normal
+    N = N / np.linalg.norm(N)
+    a1 = ray.normal
+    n1n2 = 1/self.refractive_index
+    a2 = n1n2* a1 - n1n2*np.sum(a1*N)* N + np.sqrt(1 - n1n2**2*(1 - np.sum(a1*N)**2))* N
+    if np.sign(np.sum(a1*N)) != np.sign(np.sum(a2*N)):
+      a2 = n1n2* a1 - n1n2*np.sum(a1*N)* N - np.sqrt(1 - n1n2**2*(1 - np.sum(a1*N)**2))* N
+    ray2.normal = a2
+    return ray2
+
+  def update_draw_dict(self):
+    super().update_draw_dict()
+    radius = self.radius1()
+    self.draw_dict["Radius1"] = radius
+    self.draw_dict["Radius2"] = radius if self.biconvex else 0
+
+  def __repr__(self):
+    n = len(self.class_name())
+    txt = 'Lens(f=' + repr(self.focal_length)
+    txt += ', ' + super().__repr__()[n+1::]
+    return txt
 
 def tests():
   from basic_optics import Ray
