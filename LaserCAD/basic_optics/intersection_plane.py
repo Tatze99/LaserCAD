@@ -53,7 +53,7 @@ class Intersection_plane(Opt_Element):
     # return model_intersection_plane(**self.draw_dict)
   
   
-  def spot_diagram(self, beam, aberration_analysis=False,default_diagram_size=0):
+  def spot_diagram(self, beam, aberration_analysis=False, default_diagram_size=0, save=False, filename="spot_diagram.png", title=None):
     """
       Draw the Spot diagram at the intersection plane
 
@@ -96,21 +96,13 @@ class Intersection_plane(Opt_Element):
       pos_diff = intersection_point - self.pos
       pos_diff1 = np.dot(pos_diff,np.cross((0,0,1),self.normal))
       pos_diff2 = np.dot(pos_diff,(0,0,1))
-      # print(pos_diff1,pos_diff2)
-      # pos_diff[1] = pow(pos_diff1[0]**2+pos_diff1[1]**2+pos_diff1[2]**2,0.5)
-      # pos_diff[2] = pow(pos_diff2[0]**2+pos_diff2[1]**2+pos_diff2[2]**2,0.5)
+
       if self.draw_dict["dia"]**2<pos_diff1**2+pos_diff2**2:
         self.draw_dict["dia"] = pow(pos_diff1**2+pos_diff2**2,0.5)
         self.aperture=self.draw_dict["dia"]
       point_x.append(pos_diff1)
       point_y.append(pos_diff2)
       
-      # if lamuda<0.001001:
-      #   point_x_blue.append(pos_diff1)
-      #   point_y_blue.append(pos_diff2)
-      # if lamuda>0.001059:
-      #   point_x_red.append(pos_diff1)
-      #   point_y_red.append(pos_diff2)
       
     ray_middle = rays[int(len(rays)/2)]
     point_x_middle = point_x[int(len(rays)/2)]
@@ -194,32 +186,26 @@ class Intersection_plane(Opt_Element):
       # plt.title("The tilt in the y direction at " + self.name,fontsize=15)
       # plt.title("The tilt in the y direction",fontsize=fs)
       plt.axhline(0, color = 'black', linewidth = 1)
-    fig = plt.figure()
-    ax_only = fig.add_subplot(1,1,1)
-    # area = (20 * np.random.rand(37))**2
-    # c = np.sqrt(area)
-    fs=24
+    
+    plt.figure()
+    fs=12
     a=plt.scatter(point_x,point_y,s=10,c=point_c)
-    # xy_red = [[point_x_red[ii],point_y_red[ii]] for ii in range(-12,0,1)]
-    # xy_blue = [[point_x_blue[ii],point_y_blue[ii]] for ii in range(-12,0,1)]
-    # red_spot = plt.Polygon(xy_red,facecolor="red",alpha=0.5)
-    # blue_spot = plt.Polygon(xy_blue,facecolor="blue",alpha=0.5)
-    # ax_only.add_patch(red_spot)
-    # ax_only.add_patch(blue_spot)
+
     plt.xticks(fontsize=fs)
     plt.yticks(fontsize=fs)
-    if default_diagram_size!=0:
+
+    plt.xlabel("y-axis (mm)",fontsize=fs)
+    plt.ylabel("z-axis (mm)",fontsize=fs)
+    if title is not None:
+      plt.title(title, fontsize=fs)
+
+    plt.axis('equal')
+    if default_diagram_size != 0:
       plt.xlim(-default_diagram_size,default_diagram_size)
-      # plt.ylim(-default_diagram_size,default_diagram_size)
-      plt.ylim(-5,5)
-    # plt.xlim(-0.0015,0.0015)
-    # plt.ylim(-0.0015,0.0015)
-    plt.xlabel("x-axis (mm)",fontsize=fs)
-    plt.ylabel("y-axis (mm)",fontsize=fs)
-    # plt.title("The spot diagram at " + self.name,fontsize=fs)
-    # plt.axhline(0, color = 'black', linewidth = 1,linestyle = '--')
-    # plt.axvline(0, color = 'black', linewidth = 1,linestyle = '--')
-    # plt.axis('equal')
+      plt.ylim(-default_diagram_size,default_diagram_size)
+
+    if save:
+      plt.savefig(filename, dpi=300)
     plt.show()
     return point_x,point_y
   
