@@ -39,14 +39,14 @@ def get_TFP_distances(TFP_ydist, TFP_angle):
     TFP_dist = np.sqrt(TFP_ydist**2 + TFP_xdist**2)
     TFP_delta = TFP_dist - TFP_ydist - TFP_xdist
     
-    TFP_Lam = 0.2*TFP_dist
-    Lam_PC = 0.7*TFP_dist  # 0.6 before
+    TFP_Lam = 0.1*TFP_dist
+    Lam_PC = 0.8*TFP_dist  # 0.6 before
     PC_TFP = TFP_dist - TFP_Lam - Lam_PC
     
     return TFP_dist, TFP_xdist, TFP_delta, TFP_Lam, Lam_PC, PC_TFP
 
 rotate_axis = np.pi
-offset_axis = (950+110-15,500-60,20)
+offset_axis = (950+160,500-60,20)
 
 class Newport_Mirror(Mirror):
     def __init__(self, name="Newport Mirror", aperture=25.4, **kwargs):
@@ -122,27 +122,30 @@ beam = Beam(radius=5, angle=0)
 beam.pos=[0,0,0]
 
 if UsePolRotator:
-    g = 500 # object distance: distance between the pump region and the first curved mirror
+    g = 360 # object distance: distance between the pump region and the first curved mirror
+    Delta = 150 
     length_diff = Pol_Rotater.length_diff
+    print(f"Using Polarization Rotator with length difference of {length_diff}mm")
     if UseNormalDesign: g -= 20
 else: 
-    g = 520#520
+    g = 400#520
     length_diff = 0
+    Delta = 100
     if UseNormalDesign: g = 490
     
-    
 
+difference_to_ideal_imaging = Delta - length_diff # propagation difference to ideal imaging (after roundtrip)
 # Calculation of the image distance
 b = ((f1-g)*f2**2 + f1**2 * f2) / (f1**2)
 
 pump_angle = 90   # input-output angle on the pump mirrors, standard: 90
-tele_angle1 = 4   # opening angle for coupling into telescope
-tele_angle2 = 6   # opening angle for couling into telescope # 4 before
+tele_angle1 = 5   # opening angle for coupling into telescope
+tele_angle2 = 5   # opening angle for couling into telescope # 4 before
 
 ydist_M2_M3 = 60 if UseCompactDesign else 0 # y-distance between M2 and M3, standard: 60mm
 
-xdist_R1_M1 = 300-ydist_M2_M3/2 # cut mirror x-distance from spherical mirrors
-ydist_R2_M2 = 160+ydist_M2_M3/2 # cut mirror y-distance from spherical mirrors
+xdist_R1_M1 = 190-ydist_M2_M3/2 # cut mirror x-distance from spherical mirrors
+ydist_R2_M2 = 190+ydist_M2_M3/2 # cut mirror y-distance from spherical mirrors
 
 dist_R1_M1 = xdist_R1_M1 / np.cos(rad(tele_angle1)) # propagation distance to first spherical mirror
 dist_R2_M2 = ydist_R2_M2 / np.cos(rad(tele_angle2)) # propagation distance to second spherical mirror
@@ -154,14 +157,13 @@ xdist_R2_M2 = np.sqrt(dist_R2_M2**2 - ydist_R2_M2**2)
 TFP_angle = 66
 TFP_angle = rad(2*TFP_angle - 90)
 
-difference_to_ideal_imaging = 100 - length_diff # propagation difference to ideal imaging (after roundtrip)
             
 cavity_length = f1 + f2 + g + b + difference_to_ideal_imaging   # total cavity length, g-object distance, b-image distance
             
 pump_dist = 100    # 150            # length of pump section
 P2_shift = 0
 dist_P2_M1 = g-dist_R1_M1-pump_dist/2       # distance from P2 to M1
-xdist_M3_TFP1 = 130                            # x-distance from M3 to TFP1
+xdist_M3_TFP1 = 160                            # x-distance from M3 to TFP1
 dist_vacuum_tube = xdist_R1_M1 + 70
 
 
@@ -284,7 +286,7 @@ M3.Mount.mount_list[0].flip(90)
 Pump Setup
 #####################################
 """
-pump_magnification = 0.45  
+pump_magnification = 0.42  
 max_pump_power = 14 # kW
 pump_spot_size = 15 # mm
 final_pump_area = 1e-2*(pump_magnification*pump_spot_size)**2 # cm^2
