@@ -23,6 +23,7 @@ from LaserCAD.non_interactings.pockels_cell import Pockels_Cell_Thick
 from LaserCAD.basic_optics import Composed_Mount,Unit_Mount,Lens,Post, export_to_TikZ, print_post_positions
 from copy import deepcopy
 from LaserCAD.moduls import Polarization_Rotator
+from LaserCAD.basic_optics.lens import Thicklens
 
 
 def rad(angle):
@@ -43,29 +44,35 @@ def get_TFP_distances(TFP_ydist, TFP_angle):
     return TFP_dist, TFP_xdist, TFP_delta, TFP_Lam, Lam_PC, dist_PC_TFP
 
 rotate_axis = np.pi
-offset_axis = (950+200,300,20)
+offset_axis = (950+150,300,20)
 
 class Newport_Mirror(Mirror):
-    def __init__(self, name="Newport Mirror", aperture=25.4, **kwargs):
+    def __init__(self, name="Newport Mirror", aperture=inch, mirror=False, **kwargs):
         super().__init__(name=name, aperture=aperture, **kwargs)
         self.aperture = aperture
-        if self.aperture == 25.4:
-            self.set_mount(Composed_Mount(unit_model_list=["U100-A2K", "1inch_post"]))
-        elif self.aperture == 2*25.4:
-            self.set_mount(Composed_Mount(unit_model_list=["U200-A2K", "1inch_post"]))
-        elif self.aperture == 3*25.4:
-            self.set_mount(Composed_Mount(unit_model_list=["U300-A2K", "1inch_post"]))
+        add_name = "_LH" if mirror else ""
+        if aperture == inch:
+            model = "U100-A2K"
+        elif aperture == 2*inch:
+            model = "U200-A2K"
+        elif aperture == 3*inch:
+            model = "U300-A2K"
+
+        self.set_mount(Composed_Mount(unit_model_list=[model+add_name, "1inch_post"]))
+            
 
 class Newport_Curved_Mirror(Curved_Mirror):
-    def __init__(self, name="Newport Mirror", aperture=25.4, **kwargs):
+    def __init__(self, name="Newport Mirror", aperture=inch, mirror=False, **kwargs):
         super().__init__(name=name, aperture=aperture, **kwargs)
         self.aperture = aperture
-        if self.aperture == 25.4:
-            self.set_mount(Composed_Mount(unit_model_list=["U100-A2K", "1inch_post"]))
-        elif self.aperture == 2*25.4:
-            self.set_mount(Composed_Mount(unit_model_list=["U200-A2K", "1inch_post"]))
-        elif self.aperture == 3*25.4:
-            self.set_mount(Composed_Mount(unit_model_list=["U300-A2K", "1inch_post"]))
+        add_name = "_LH" if mirror else ""
+        if aperture == inch:
+            model = "U100-A2K"
+        elif aperture == 2*inch:
+            model = "U200-A2K"
+        elif aperture == 3*inch:
+            model = "U300-A2K"
+        self.set_mount(Composed_Mount(unit_model_list=[model+add_name, "1inch_post"]))
 
 class Table(Crystal):
     def __init__(self, name="Table", width=1000, height=10, thickness=1000, **kwargs):
@@ -118,11 +125,9 @@ if UsePolRotator:
     g = 530 # object distance: distance between the pump region and the first curved mirror
     length_diff = Pol_Rotater.length_diff
     print(f"Using Polarization Rotator with length difference of {length_diff}mm")
-    if UseNormalDesign: g -= 20
 else: 
     g = 550#520
     length_diff = 0
-    if UseNormalDesign: g = 490
     
 ydist_M2_M3 = 70
 
@@ -133,8 +138,8 @@ pump_angle = 90   # input-output angle on the pump mirrors, standard: 90
 tele_angle1 = 4   # opening angle for coupling into telescope
 tele_angle2 = 4   # opening angle for couling into telescope # 4 before
 
-xdist_R1_M1 = 190 # cut mirror x-distance from spherical mirrors
-ydist_R2_M2 = 330 # cut mirror y-distance from spherical mirrors
+xdist_R1_M1 = 200 # cut mirror x-distance from spherical mirrors
+ydist_R2_M2 = 350 # cut mirror y-distance from spherical mirrors
 
 dist_P2_M4 = 60  # distance from pump mirror P2 to M4
 dist_R1_M1 = xdist_R1_M1 / np.cos(rad(tele_angle1)) # propagation distance to first spherical mirror
@@ -148,9 +153,9 @@ TFP_angle = rad(2*TFP_angle - 90)
             
 cavity_length = f1 + f2 + g + b  # total cavity length, g-object distance, b-image distance
             
-pump_dist = 100    # 150            # length of pump section
+pump_dist = 90    # 150            # length of pump section
 dist_M4_M1 = g-dist_P2_M4-dist_R1_M1-pump_dist/2       # distance from P2 to M1
-xdist_M3_TFP1 = 160                            # x-distance from M3 to TFP1
+xdist_M3_TFP1 = 150                            # x-distance from M3 to TFP1
 dist_vacuum_tube = xdist_R1_M1 + 150
 
 # ydist: difference between beam y-position at TFP2 and the vacuum tube
@@ -158,15 +163,15 @@ dist_vacuum_tube = xdist_R1_M1 + 150
 ydist = pump_dist + dist_M4_M1 - ydist_R1_M1 
 TFP_ydist = ydist - ydist_M2_M3
 TFP_dist, TFP_xdist, TFP_delta, TFP_Lam, Lam_PC, dist_PC_TFP = get_TFP_distances(TFP_ydist, TFP_angle)
-
+dist_R2_M3 = (ydist_R2_M2-ydist_M2_M3) / np.cos(rad(tele_angle2))
 
 print(f"lambda PC distance = {Lam_PC}mm")
 print("Cavity")
 print(f"g = {g}mm, b = {b}mm")
 
-P1 = Newport_Mirror(name="pump mirror 1", phi=pump_angle, aperture=25.4*2) # pump mirror 1
+P1 = Newport_Mirror(name="pump mirror 1", phi=pump_angle, aperture=25.4*2, mirror=True) # pump mirror 1
 # P1.set_mount(Adapter_2inch(angle=90))
-P2 = Newport_Mirror(name="pump mirror 2", phi=-pump_angle, aperture=25.4*2)  # pump mirror 2
+P2 = Newport_Mirror(name="pump mirror 2", phi=-pump_angle, aperture=25.4*2, mirror=True)  # pump mirror 2
 M1 = Newport_Mirror(name="M1, cut mirror 1", phi=-pump_angle-tele_angle1) # cut mirror 1
 M2 = Newport_Mirror(phi=90, name="M2, cut mirror 2") # cut mirror 2
 M3 = Newport_Mirror(phi=-90+tele_angle2, name="M3, mirror towards tfp 1") # mirror to TFP1
@@ -191,15 +196,15 @@ Setup.propagate(dist_M4_M1)
 Setup.add_on_axis(M1)
 Setup.propagate(dist_R1_M1)
 Setup.add_on_axis(R1)
-print(f"distance to first curved mirror: {Setup.optical_path_length():.2f}mm, g={g}mm")
+# print(f"distance to first curved mirror: {Setup.optical_path_length():.2f}mm, g={g}mm")
 Setup.propagate(dist_vacuum_tube)
 Setup.add_on_axis(vacuum_tube)
-Setup.propagate(f1+f2-dist_vacuum_tube-dist_R2_M2)
+Setup.propagate(f1+f2-dist_vacuum_tube-ydist_R2_M2)
 Setup.add_on_axis(M2)
-Setup.propagate(dist_R2_M2)
+Setup.propagate(ydist_R2_M2)
 Setup.add_on_axis(R2)
-print(f"distance to first second curved mirror: {Setup.optical_path_length():.2f}mm, g+f1+f2={g+f1+f2}mm")
-Setup.propagate(ydist_R2_M2-ydist_M2_M3)
+# print(f"distance to first second curved mirror: {Setup.optical_path_length():.2f}mm, g+f1+f2={g+f1+f2}mm")
+Setup.propagate(dist_R2_M3)
 Setup.add_on_axis(M3)
 Setup.propagate(xdist_M3_TFP1)
 Setup.add_on_axis(TFP1)
@@ -218,20 +223,18 @@ pockels_cell.rotate(pockels_cell.normal, np.pi)
 
 Setup.propagate(dist_PC_TFP)
 Setup.add_on_axis(TFP2)
-dist_TFP2_P1 = np.linalg.norm(TFP2.pos - pos_start)
+dist_TFP2_P1 = abs(TFP2.pos[0] - pos_start[0])
 
 Setup.propagate(dist_TFP2_P1)
 Setup.add_on_axis(P1)
 Setup.propagate(pump_dist/2)
 
-image_distance = ydist_R2_M2-ydist_M2_M3+xdist_M3_TFP1+TFP_dist+dist_TFP2_P1+pump_dist/2
+dist_to_ideal_imaging = Setup.optical_path_length()+length_diff - cavity_length
+image_distance = dist_R2_M3+xdist_M3_TFP1+TFP_dist+dist_TFP2_P1+pump_dist/2-dist_to_ideal_imaging
 
 print(f"Image Distance = {image_distance:.2f} (adding all lengths) = {b:.2f} (b)")
-print(f"distance to ideal imaging = {Setup.optical_path_length()+length_diff - cavity_length:.2f}mm")
-print(f"optical path length = {Setup.optical_path_length()+length_diff:.2f}mm, cavity length = {cavity_length:.2f}mm\n")
-
-# M3.Mount.mount_list[0].flip(90)
-# P1.Mount.mount_list[0].flip(90)
+print(f"distance to ideal imaging = {dist_to_ideal_imaging:.2f}mm")
+print(f"optical path length = {Setup.optical_path_length()+length_diff:.2f}mm\n")
 
 
 """
@@ -246,8 +249,11 @@ final_pump_area = 1e-2*(pump_magnification*pump_spot_size)**2 # cm^2
 
 focal_length1 = 85 # 125
 focal_length2 = 100
-lasermedia_dist = 20 # distance from the image planes of the two laser media
-image_plane_to_pump_module_distance = 65 # distance from the pump module to the image plane
+lasermedia_dist = 17 # distance from the image planes of the two laser media
+image_plane_to_pump_module_distance = 0#65 # distance from the pump module to the image plane
+
+Lens_pump_top = Thicklens(f=focal_length1, n=1.515, aperture=3*inch, name=f"Pump Lens 1, f={focal_length1}mm")
+Lens_pump_bot = Thicklens(f=focal_length1, n=1.515, aperture=3*inch, name=f"Pump Lens 2, f={focal_length1}mm")
 
 object_distance = focal_length1 * (1 + 1/pump_magnification)
 image_distance = focal_length1 * (1 + pump_magnification)
@@ -258,8 +264,8 @@ print(f"distance from pump module to image plane = {image_plane_to_pump_module_d
 print(f"pump magnification = {pump_magnification:.2f}, final spot size = {pump_magnification*pump_spot_size:.1f}mm, A = {final_pump_area:.2f}cm²")
 print(f"pump intensity = {max_pump_power/final_pump_area:.1f}kW/cm²\n")
 
-dist_M3_pump_lens = 40
-pump_module_separation = 2*image_distance + 2*dist_M3_pump_lens + lasermedia_dist
+dist_M3_pump_lens = 25
+pump_module_separation = 2*(image_distance+Lens_pump_top.h1+Lens_pump_top.h2+Lens_pump_top.thickness) + 2*dist_M3_pump_lens + lasermedia_dist
 pump_module_lens_dist = object_distance + image_plane_to_pump_module_distance
 pump_module_xoffset = pump_module_lens_dist-dist_M3_pump_lens
 
@@ -296,15 +302,14 @@ Kuehlmount_Alumosilikatglas.freecad_model = load_STL
 
 Kuehlmount2_Alumosilikatglas = deepcopy(Kuehlmount_Alumosilikatglas)
 
-lens_pump_top = Lens(f=focal_length1, name=f"Pump Lens 1, f={focal_length1}mm")
-lens_pump_top.aperture = 25.4*3
-lens_pump_top.set_mount_to_default()
+# lens_pump_top = Lens(f=focal_length1, name=f"Pump Lens 1, f={focal_length1}mm")
+# lens_pump_top.aperture = 25.4*3
+# lens_pump_top.set_mount_to_default()
 
-lens_pump_bot = deepcopy(lens_pump_top)
-lens_pump_bot.name = f"Pump Lens 2, f={focal_length1}mm"
+# lens_pump_bot = deepcopy(lens_pump_top)
+# lens_pump_bot.name = f"Pump Lens 2, f={focal_length1}mm"
 
-M3_1 = Newport_Mirror(phi=-90, name="3inch mirror", aperture=25.4*3)
-M3_1.Mount.mount_list[0].flip(90)
+M3_1 = Newport_Mirror(phi=-90, name="3inch mirror", aperture=25.4*3, mirror=True)
 M3_2 = Newport_Mirror(phi=90, name="3inch mirror 2", aperture=25.4*3)
 LiMgAS_crystal1 = Cylindric_Crystal(name="LiMgAs", aperture=23, thickness=12)
 LiMgAS_crystal2 = Cylindric_Crystal(name="LiMgAs2", aperture=23, thickness=12)
@@ -315,11 +320,12 @@ print(f"PM19 top position = ({Pump_top.pos[0]/10:.1f}cm, {Pump_top.pos[1]/10:.1f
 Pump_top.add_on_axis(Laser_Head_in)
 Pump_top.propagate(pump_module_lens_dist-dist_M3_pump_lens)
 Pump_top.add_on_axis(M3_1)
-Pump_top.propagate(dist_M3_pump_lens)
-Pump_top.add_on_axis(lens_pump_top)
-Pump_top.propagate(image_distance-6)
+Pump_top.propagate(dist_M3_pump_lens+Lens_pump_top.h1)
+Pump_top.add_on_axis(Lens_pump_top)
+Pump_top.propagate(image_distance-6+Lens_pump_top.h2)
 Pump_top.add_on_axis(Kuehlmount_Alumosilikatglas)
 Pump_top.add_on_axis(LiMgAS_crystal1)
+Pump_top.propagate(6)
 
 
 Pump_bot.pos += offset_axis
@@ -327,11 +333,12 @@ print(f"PM19 bot position = ({Pump_bot.pos[0]/10:.1f}cm, {Pump_bot.pos[1]/10:.1f
 Pump_bot.add_on_axis(Laser_Head_out)
 Pump_bot.propagate(pump_module_lens_dist-dist_M3_pump_lens)
 Pump_bot.add_on_axis(M3_2)
-Pump_bot.propagate(dist_M3_pump_lens)
-Pump_bot.add_on_axis(lens_pump_bot)
-Pump_bot.propagate(image_distance-6)
+Pump_bot.propagate(dist_M3_pump_lens+Lens_pump_bot.h1)
+Pump_bot.add_on_axis(Lens_pump_bot)
+Pump_bot.propagate(image_distance-6+Lens_pump_bot.h2)
 Pump_bot.add_on_axis(Kuehlmount2_Alumosilikatglas)
 Pump_bot.add_on_axis(LiMgAS_crystal2)
+Pump_bot.propagate(6)
 
 table = Table(name="Right Table", width=900, height=10, thickness=1500)
 table.pos = (0,450,-5)

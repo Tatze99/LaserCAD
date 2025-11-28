@@ -11,7 +11,7 @@ from copy import deepcopy
 from .ray import Ray
 from .beam import Beam #,RayGroup
 import matplotlib.pyplot as plt
-# import matplotlib.patches as patches
+import matplotlib.patches as patches
 # from .freecad_models import model_intersection_plane,iris_post
 from ..freecad_models import model_intersection_plane
 from ..freecad_models.freecad_model_ray import RAY_COLOR
@@ -53,7 +53,7 @@ class Intersection_plane(Opt_Element):
     # return model_intersection_plane(**self.draw_dict)
   
   
-  def spot_diagram(self, beam, aberration_analysis=False, default_diagram_size=0, save=False, filename="spot_diagram.png", title=None):
+  def spot_diagram(self, beam, aberration_analysis=False, default_diagram_size=0, save=False, filename="spot_diagram.png", title=None, draw_rectangle=False, rectangle_size=(10,10)):
     """
       Draw the Spot diagram at the intersection plane
 
@@ -187,25 +187,32 @@ class Intersection_plane(Opt_Element):
       # plt.title("The tilt in the y direction",fontsize=fs)
       plt.axhline(0, color = 'black', linewidth = 1)
     
-    plt.figure()
+    fig, ax = plt.subplots()
     fs=12
-    a=plt.scatter(point_x,point_y,s=10,c=point_c)
+    a=ax.scatter(point_x,point_y,s=5,c=point_c, alpha=0.2)
 
-    plt.xticks(fontsize=fs)
-    plt.yticks(fontsize=fs)
+    if draw_rectangle:
+      x = -rectangle_size[0]/2
+      y = -rectangle_size[1]/2
+      width = rectangle_size[0]
+      height = rectangle_size[1]
+      ax.add_patch(patches.Rectangle((x, y), width, height, fill=False, edgecolor='red'))
 
-    plt.xlabel("y-axis (mm)",fontsize=fs)
-    plt.ylabel("z-axis (mm)",fontsize=fs)
+    ax.tick_params(axis='x', labelsize=fs)
+    ax.tick_params(axis='y', labelsize=fs)
+
+    ax.set_xlabel("y-axis (mm)",fontsize=fs)
+    ax.set_ylabel("z-axis (mm)",fontsize=fs)
     if title is not None:
-      plt.title(title, fontsize=fs)
+      ax.set_title(title, fontsize=fs)
 
-    plt.axis('equal')
+    ax.axis('equal')
     if default_diagram_size != 0:
-      plt.xlim(-default_diagram_size,default_diagram_size)
-      plt.ylim(-default_diagram_size,default_diagram_size)
+      ax.set_xlim(-default_diagram_size,default_diagram_size)
+      ax.set_ylim(-default_diagram_size,default_diagram_size)
 
     if save:
-      plt.savefig(filename, dpi=300)
+      fig.savefig(filename, dpi=300)
     plt.show()
     return point_x,point_y
   
