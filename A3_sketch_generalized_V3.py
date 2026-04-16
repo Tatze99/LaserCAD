@@ -265,16 +265,16 @@ Lens_pump_top_f2 = Lens(f=focal_length2, n=1.515, aperture=3*inch, name=f"Pump L
 Lens_pump_bot_f1 = Lens(f=focal_length1, n=1.515, aperture=3*inch, name=f"Pump Lens bot, f1={focal_length1}mm")
 Lens_pump_bot_f2 = Lens(f=focal_length2, n=1.515, aperture=3*inch, name=f"Pump Lens bot, f2={focal_length2}mm")
 
-Lens_pump_top_f1.aperture = 25.4*3
+Lens_pump_top_f1.aperture = 25.4*2
 Lens_pump_top_f1.set_mount_to_default()
 Lens_pump_top_f2.aperture = 25.4*3
 Lens_pump_top_f2.set_mount_to_default()
-Lens_pump_bot_f1.aperture = 25.4*3
+Lens_pump_bot_f1.aperture = 25.4*2
 Lens_pump_bot_f1.set_mount_to_default()
 Lens_pump_bot_f2.aperture = 25.4*3
 Lens_pump_bot_f2.set_mount_to_default()
 
-image_distance = 170
+image_distance = 120
 object_distance = image_telescope(focal_length1, focal_length2, b=image_distance)
 
 print("Pump Setup:")
@@ -288,19 +288,21 @@ print(f"maximum output fluence = {max_laser_fluence}J/cm²")
 print(f"maximum laser energy = {max_laser_fluence*final_pump_area:.1f}J\n")
 
 dist_M3_pump_lens = 50
-pump_module_separation = 300
 dist_to_first_pump_lens = image_plane_to_pump_module_distance + object_distance
-dist_M2_pump_lens2 = 70
-pump_module_xoffset = 200
+dist_M2_pump_lens2 = 100
+pump_module_xoffset = 270
 
 total_pump_length = dist_to_first_pump_lens + focal_length1 + focal_length2 + image_distance + lasermedia_dist
-remaining_length = total_pump_length - pump_module_xoffset - pump_module_separation/2 - dist_M2_pump_lens2 
 
-remaining_length1 = remaining_length/2 - dist_M2_pump_lens2**2/(2*remaining_length)
+pump_module_separation = 2*image_distance + lasermedia_dist + dist_M2_pump_lens2
+remaining_length = total_pump_length - pump_module_xoffset - dist_M2_pump_lens2 - image_distance - lasermedia_dist/2
+
+y_dist_M2_pump_axis = image_distance + lasermedia_dist/2 + dist_M2_pump_lens2 - pump_module_separation/2
+
+remaining_length1 = remaining_length/2 - y_dist_M2_pump_axis**2/(2*remaining_length)
 remaining_length2 = remaining_length - remaining_length1
-angle_pump_mirror = deg(np.arcsin(dist_M2_pump_lens2/remaining_length2))
+angle_pump_mirror = deg(np.arcsin(y_dist_M2_pump_axis/remaining_length2))
 
-print("remaining lengths:", remaining_length, remaining_length1, remaining_length2)
 beamtop_1 = Ray_Distribution(radius=pump_spot_size/2,angle=1.4*2.08*np.pi/180,wavelength=940E-6, steps=3)
 beamtop_1.draw_dict["color"] = (255/256,255/256,0.0)
 
