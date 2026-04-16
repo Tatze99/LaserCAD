@@ -378,6 +378,6 @@ if __name__ == "__main__":
         print_post_positions(Pump_top)
         print_post_positions(Pump_bot)
 
-        export_to_TikZ(Pump_top, draw_beams=True, beam_color="optikzred")
-        export_to_TikZ(Pump_bot, draw_beams=True, beam_color="optikzred")
-        export_to_TikZ(Setup, draw_rays=True)
+        # export_to_TikZ(Pump_top, draw_beams=True, beam_color="optikzred")
+        # export_to_TikZ(Pump_bot, draw_beams=True, beam_color="optikzred")
+        # export_to_TikZ(Setup, draw_rays=True)

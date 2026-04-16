@@ -51,7 +51,12 @@ def test_composition(offset=0, f=85, aperture=75, edge_thickness=3, biconvex=Fal
   image_distance = f * (1 + pump_magnification)
   print(f"focal length: {f:.2f}mm, object distance: {object_distance:.2f}mm, image distance: {image_distance:.2f}mm")
   Lens1 = Thicklens(f=f, n=1.515, aperture=aperture, biconvex=biconvex)
+  # Lens1 = Lens(f=f)
 
+  if not hasattr(Lens1, 'h1') or not hasattr(Lens1, 'h2'):
+    Lens1.h1 = 0
+    Lens1.h2 = 0
+  
   print(f"principal planes: h1 = {Lens1.h1:.2f}mm, h2 = {Lens1.h2:.2f}mm")
 
   steps = 3 if freecad_da else 9
@@ -60,6 +65,7 @@ def test_composition(offset=0, f=85, aperture=75, edge_thickness=3, biconvex=Fal
   Comp.pos += (0, -offset,50)
   Beam = Ray_Distribution(radius=pump_spot_size/2,angle=1*2.08*np.pi/180,wavelength=940E-6, steps=steps)
   Comp.set_light_source(Beam)
+  Comp.propagate(0)
   IP1 = Intersection_plane()
   IP1.draw()
   # if draw_spot_diagram and not freecad_da: 
@@ -113,6 +119,8 @@ def test_composition(offset=0, f=85, aperture=75, edge_thickness=3, biconvex=Fal
     plt.ylabel("Percentage of Rays inside Spot Size (%)")
     plt.axvline(final_spot_size, color='red', linestyle='--', label=f'Target Spot Size={final_spot_size:.2f}mm')
     plt.legend()
+    if save:
+      plt.savefig(file_name.replace("spot_diagram", "percentage_vs_spot_size").replace(".pdf", ".png"), dpi=300)
   # test_radius(Lens1)
 
   return Comp, IP2
@@ -125,7 +133,7 @@ def generate_file_name(focal_length, biconvex, aperture, pump_magnification, add
     add_text = "_"+add_text
   lens_type = "biconvex" if biconvex else "planoconvex"
   telescope_str = "_telescope" if add_telescope else ""
-  return os.path.join(Folder,"plots",f"spot_diagram_{lens_type}_f{focal_length}mm_D{aperture:.1f}mm_M{pump_magnification}{telescope_str}_{add_propagation}mm-from-focus{add_text}.png")
+  return os.path.join(Folder,"plots",f"spot_diagram_{lens_type}_f{focal_length}mm_D{aperture:.1f}mm_M{pump_magnification}{telescope_str}_{add_propagation}mm-from-focus{add_text}.pdf")
 
 def generate_title(focal_length, biconvex, aperture, pump_magnification):
   lens_type = "Biconvex" if biconvex else "Planoconvex"
@@ -134,7 +142,7 @@ def generate_title(focal_length, biconvex, aperture, pump_magnification):
 if freecad_da:
   clear_doc()
 
-save = True
+save = False
 
 set_plot_params()
 
