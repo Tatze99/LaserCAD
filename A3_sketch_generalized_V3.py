@@ -59,6 +59,7 @@ class Newport_Mirror(Mirror):
             model = "U300-A2K"
 
         self.set_mount(Composed_Mount(unit_model_list=[model+add_name, "1inch_post"]))
+        self.set_mount_back_mounted()
             
 
 class Newport_Curved_Mirror(Curved_Mirror):
@@ -255,8 +256,8 @@ pump_spot_size = 15 # mm
 final_pump_area = 1e-2*(pump_magnification*pump_spot_size)**2 # cm^2
 max_laser_fluence = 5 # J/cm^2
 
-focal_length1 = 300 # 125
-focal_length2 = 100
+focal_length1 = 300 #500
+focal_length2 = 100 #150
 lasermedia_dist = 17 # distance from the image planes of the two laser media
 image_plane_to_pump_module_distance = 65 # distance from the pump module to the image plane
 
@@ -265,14 +266,6 @@ Lens_pump_top_f2 = Lens(f=focal_length2, n=1.515, aperture=3*inch, name=f"Pump L
 Lens_pump_bot_f1 = Lens(f=focal_length1, n=1.515, aperture=3*inch, name=f"Pump Lens bot, f1={focal_length1}mm")
 Lens_pump_bot_f2 = Lens(f=focal_length2, n=1.515, aperture=3*inch, name=f"Pump Lens bot, f2={focal_length2}mm")
 
-Lens_pump_top_f1.aperture = 25.4*2
-Lens_pump_top_f1.set_mount_to_default()
-Lens_pump_top_f2.aperture = 25.4*3
-Lens_pump_top_f2.set_mount_to_default()
-Lens_pump_bot_f1.aperture = 25.4*2
-Lens_pump_bot_f1.set_mount_to_default()
-Lens_pump_bot_f2.aperture = 25.4*3
-Lens_pump_bot_f2.set_mount_to_default()
 
 image_distance = 120
 object_distance = image_telescope(focal_length1, focal_length2, b=image_distance)
