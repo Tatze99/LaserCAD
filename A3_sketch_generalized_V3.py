@@ -57,6 +57,8 @@ class Newport_Mirror(Mirror):
             model = "U200-A2K"
         elif aperture == 3*inch:
             model = "U300-A2K"
+        elif aperture == 4*inch:
+            model = "U400-AC2K"
 
         self.set_mount(Composed_Mount(unit_model_list=[model+add_name, "1inch_post"]))
         self.set_mount_back_mounted()
@@ -154,7 +156,7 @@ TFP_angle = rad(2*TFP_angle - 90)
             
 cavity_length = f1 + f2 + g + b  # total cavity length, g-object distance, b-image distance
             
-pump_dist = 80    # 150            # length of pump section
+pump_dist = 90    # 150            # length of pump section
 dist_M4_M1 = g-dist_P2_M4-dist_R1_M1-pump_dist/2       # distance from P2 to M1
 xdist_M3_TFP1 = 150                            # x-distance from M3 to TFP1
 dist_vacuum_tube = xdist_R1_M1 + 150
@@ -182,6 +184,14 @@ R2 = Newport_Curved_Mirror(name=f"R2, f={f2:.0f}mm", phi=-180-tele_angle2, radiu
 TFP1 = Newport_Mirror(name="TFP1 (Input)", phi=-90+deg(TFP_angle), aperture=25.4*2)
 TFP2 = Newport_Mirror(name="TFP2 (Output)", phi=90-deg(TFP_angle), aperture=25.4*2)
 pockels_cell = Pockels_Cell_Thick(name="Pockels Cell", mount_name="Pockels_cell_thick")
+
+for mirror in [P1, P2, TFP1, TFP2]:
+    mirror.thickness = 9
+    mirror.set_mount_back_mounted()
+
+for mirror in [M1, M2, M3, M4]:
+    mirror.thickness = 6
+    mirror.set_mount_back_mounted()
 
 Setup = Composition(name="A3")
 Setup.set_light_source(beam)
@@ -261,10 +271,10 @@ focal_length2 = 100 #150
 lasermedia_dist = 17 # distance from the image planes of the two laser media
 image_plane_to_pump_module_distance = 65 # distance from the pump module to the image plane
 
-Lens_pump_top_f1 = Lens(f=focal_length1, n=1.515, aperture=3*inch, name=f"Pump Lens top, f1={focal_length1}mm")
-Lens_pump_top_f2 = Lens(f=focal_length2, n=1.515, aperture=3*inch, name=f"Pump Lens top f2={focal_length2}mm")
-Lens_pump_bot_f1 = Lens(f=focal_length1, n=1.515, aperture=3*inch, name=f"Pump Lens bot, f1={focal_length1}mm")
-Lens_pump_bot_f2 = Lens(f=focal_length2, n=1.515, aperture=3*inch, name=f"Pump Lens bot, f2={focal_length2}mm")
+Lens_pump_top_f1 = Thicklens(f=focal_length1, n=1.515, aperture=3*inch, name=f"Pump Lens top, f1={focal_length1}mm")
+Lens_pump_top_f2 = Thicklens(f=focal_length2, n=1.515, aperture=3*inch, name=f"Pump Lens top, f2={focal_length2}mm")
+Lens_pump_bot_f1 = Thicklens(f=focal_length1, n=1.515, aperture=3*inch, name=f"Pump Lens bot, f1={focal_length1}mm")
+Lens_pump_bot_f2 = Thicklens(f=focal_length2, n=1.515, aperture=3*inch, name=f"Pump Lens bot, f2={focal_length2}mm")
 
 
 image_distance = 120
@@ -282,7 +292,7 @@ print(f"maximum laser energy = {max_laser_fluence*final_pump_area:.1f}J\n")
 
 dist_M3_pump_lens = 50
 dist_to_first_pump_lens = image_plane_to_pump_module_distance + object_distance
-dist_M2_pump_lens2 = 100
+dist_M2_pump_lens2 = 95
 pump_module_xoffset = 270
 
 total_pump_length = dist_to_first_pump_lens + focal_length1 + focal_length2 + image_distance + lasermedia_dist
@@ -302,14 +312,16 @@ beamtop_1.draw_dict["color"] = (255/256,255/256,0.0)
 beambot_1 = Ray_Distribution(radius=pump_spot_size/2,angle=1.4*2.08*np.pi/180,wavelength=940E-6, steps=3)
 beambot_1.draw_dict["color"] = (255/256,255/256,0.0)
 
+thicklens_xdeviation = getattr(Lens_pump_top_f1, "h1", 0) + getattr(Lens_pump_top_f1, "h2", 0) + getattr(Lens_pump_top_f1, "thickness", 0) 
+thicklens_ydeviation = getattr(Lens_pump_top_f2, "h1", 0) + getattr(Lens_pump_top_f2, "h2", 0) + getattr(Lens_pump_top_f2, "thickness", 0) 
+
 Pump_top = Composition(name="PM19 top")
 Pump_top.set_light_source(beamtop_1)
-Pump_top.pos -= (pump_module_xoffset,-pump_module_separation/2,0)
-
+Pump_top.pos -= (pump_module_xoffset+thicklens_xdeviation,-pump_module_separation/2-thicklens_ydeviation,0)
 
 Pump_bot = Composition(name="PM19 bot")
 Pump_bot.set_light_source(beambot_1)
-Pump_bot.pos -= (pump_module_xoffset,pump_module_separation/2,0)
+Pump_bot.pos -= (pump_module_xoffset+thicklens_xdeviation,pump_module_separation/2+thicklens_ydeviation,0)
 
 Laser_Head_in = Component(name="laser Pump Module PM19 bot")
 stl_file = rf"{thisfolder}\misc_meshes\PM19_2.stl"
@@ -328,18 +340,19 @@ Kuehlmount_Alumosilikatglas.freecad_model = load_STL
 
 Kuehlmount2_Alumosilikatglas = deepcopy(Kuehlmount_Alumosilikatglas)
 
-# lens_pump_top = Lens(f=focal_length1, name=f"Pump Lens 1, f={focal_length1}mm")
-# lens_pump_top.aperture = 25.4*3
-# lens_pump_top.set_mount_to_default()
+M3_top = Newport_Mirror(phi=180-angle_pump_mirror, name="4inch silver mirror", aperture=25.4*4)
+M3_bot = Newport_Mirror(phi=180+angle_pump_mirror, name="4inch silver mirror 2", aperture=25.4*4)
 
-# lens_pump_bot = deepcopy(lens_pump_top)
-# lens_pump_bot.name = f"Pump Lens 2, f={focal_length1}mm"
+for mirror in [M3_top, M3_bot]:
+    mirror.thickness = 22
+    mirror.set_mount_back_mounted()
 
-M3_top = Newport_Mirror(phi=180-angle_pump_mirror, name="3inch mirror", aperture=25.4*3, mirror=True)
-M3_bot = Newport_Mirror(phi=180+angle_pump_mirror, name="3inch mirror 2", aperture=25.4*3)
+M3_top2 = Newport_Mirror(phi=+90+angle_pump_mirror, name="3inch dielectric mirror", aperture=25.4*3, mirror=True)
+M3_bot2 = Newport_Mirror(phi=-90-angle_pump_mirror, name="3inch dielectric mirror 2", aperture=25.4*3)
 
-M3_top2 = Newport_Mirror(phi=+90+angle_pump_mirror, name="3inch mirror", aperture=25.4*3, mirror=True)
-M3_bot2 = Newport_Mirror(phi=-90-angle_pump_mirror, name="3inch mirror 2", aperture=25.4*3)
+for mirror in [M3_top2, M3_bot2]:
+    mirror.thickness = 18
+    mirror.set_mount_back_mounted()
 
 LiMgAS_crystal1 = Cylindric_Crystal(name="LiMgAs", aperture=23, thickness=12)
 LiMgAS_crystal2 = Cylindric_Crystal(name="LiMgAs2", aperture=23, thickness=12)
@@ -348,17 +361,17 @@ Pump_top.pos += offset_axis
 print(f"PM19 top position = ({Pump_top.pos[0]/10:.1f}cm, {Pump_top.pos[1]/10:.1f}cm, {Pump_top.pos[2]/10:.1f}cm)")
 Pump_top.add_on_axis(Laser_Head_in)
 Pump_top.propagate(dist_to_first_pump_lens)
-if hasattr(Lens_pump_top_f1, "h1"): Pump_top.propagate(Lens_pump_top_f1.h1)
+Pump_top.propagate(getattr(Lens_pump_top_f1, "h1", 0))
 Pump_top.add_on_axis(Lens_pump_top_f1)
-if hasattr(Lens_pump_top_f1, "h2"): Pump_top.propagate(Lens_pump_top_f1.h2)
+Pump_top.propagate(getattr(Lens_pump_top_f1, "h2", 0))
 Pump_top.propagate(pump_module_xoffset - dist_to_first_pump_lens + remaining_length1)
 Pump_top.add_on_axis(M3_top)
 Pump_top.propagate(remaining_length2)
 Pump_top.add_on_axis(M3_top2)
 Pump_top.propagate(dist_M2_pump_lens2)
-if hasattr(Lens_pump_top_f2, "h1"): Pump_top.propagate(Lens_pump_top_f2.h1)
+Pump_top.propagate(getattr(Lens_pump_top_f2, "h1", 0))
 Pump_top.add_on_axis(Lens_pump_top_f2)
-if hasattr(Lens_pump_top_f2, "h2"): Pump_top.propagate(Lens_pump_top_f2.h2)
+Pump_top.propagate(getattr(Lens_pump_top_f2, "h2", 0))
 Pump_top.propagate(image_distance-6)
 Pump_top.add_on_axis(Kuehlmount_Alumosilikatglas)
 Pump_top.add_on_axis(LiMgAS_crystal1)
@@ -369,17 +382,17 @@ Pump_bot.pos += offset_axis
 print(f"PM19 bot position = ({Pump_bot.pos[0]/10:.1f}cm, {Pump_bot.pos[1]/10:.1f}cm, {Pump_bot.pos[2]/10:.1f}cm)\n")
 Pump_bot.add_on_axis(Laser_Head_out)
 Pump_bot.propagate(dist_to_first_pump_lens)
-if hasattr(Lens_pump_bot_f1, "h1"): Pump_bot.propagate(Lens_pump_bot_f1.h1)
+Pump_bot.propagate(getattr(Lens_pump_bot_f1, "h1", 0))
 Pump_bot.add_on_axis(Lens_pump_bot_f1)
-if hasattr(Lens_pump_bot_f1, "h2"): Pump_bot.propagate(Lens_pump_bot_f1.h2)
+Pump_bot.propagate(getattr(Lens_pump_bot_f1, "h2", 0))
 Pump_bot.propagate(pump_module_xoffset - dist_to_first_pump_lens + remaining_length1)
 Pump_bot.add_on_axis(M3_bot)
 Pump_bot.propagate(remaining_length2)
 Pump_bot.add_on_axis(M3_bot2)
 Pump_bot.propagate(dist_M2_pump_lens2)
-if hasattr(Lens_pump_bot_f2, "h1"): Pump_bot.propagate(Lens_pump_bot_f2.h1)
+Pump_bot.propagate(getattr(Lens_pump_bot_f2, "h1", 0))
 Pump_bot.add_on_axis(Lens_pump_bot_f2)
-if hasattr(Lens_pump_bot_f2, "h2"): Pump_bot.propagate(Lens_pump_bot_f2.h2)
+Pump_bot.propagate(getattr(Lens_pump_bot_f2, "h2", 0))
 Pump_bot.propagate(image_distance-6)
 Pump_bot.add_on_axis(Kuehlmount2_Alumosilikatglas)
 Pump_bot.add_on_axis(LiMgAS_crystal2)
