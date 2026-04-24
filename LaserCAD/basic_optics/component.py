@@ -16,9 +16,11 @@ class Component(Geom_Object):
   class for shaped components with mounts, posts and bases
   developes into Optical_Element and many non interactings
   """
-  def __init__(self, name="Component", **kwargs):
+  def __init__(self, name="Component", aperture=1*inch, **kwargs):
     super().__init__(name, **kwargs)
-    self._aperture = 1*inch # Aperture in mm for drawing, Mount and clipping (not yet implemented)
+    if type(aperture) == int:
+      aperture = inch*float(aperture) # convert integer values to inch, for easier use
+    self._aperture = aperture # Aperture in mm for drawing, Mount and clipping (not yet implemented)
     self.thickness = 5 # Thickness in mm, importent for mount placing and drawing
     self.set_mount_to_default()
    
