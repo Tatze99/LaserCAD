@@ -47,8 +47,8 @@ rotate_axis = np.pi
 offset_axis = (950+150,300,20)
 
 class Newport_Mirror(Mirror):
-    def __init__(self, name="Newport Mirror", aperture=inch, mirror=False, **kwargs):
-        super().__init__(name=name, aperture=aperture, **kwargs)
+    def __init__(self, name="Newport Mirror", aperture=inch, thickness=6, mirror=False, **kwargs):
+        super().__init__(name=name, aperture=aperture, thickness=thickness, **kwargs)
         self.aperture = aperture
         add_name = "_LH" if mirror else ""
         if aperture == inch:
@@ -65,8 +65,8 @@ class Newport_Mirror(Mirror):
             
 
 class Newport_Curved_Mirror(Curved_Mirror):
-    def __init__(self, name="Newport Mirror", aperture=inch, mirror=False, **kwargs):
-        super().__init__(name=name, aperture=aperture, **kwargs)
+    def __init__(self, name="Newport Mirror", aperture=inch, thickness=6, mirror=False, **kwargs):
+        super().__init__(name=name, aperture=aperture, thickness=thickness, **kwargs)
         self.aperture = aperture
         add_name = "_LH" if mirror else ""
         if aperture == inch:
@@ -76,6 +76,7 @@ class Newport_Curved_Mirror(Curved_Mirror):
         elif aperture == 3*inch:
             model = "U300-A2K"
         self.set_mount(Composed_Mount(unit_model_list=[model+add_name, "1inch_post"]))
+        self.set_mount_back_mounted()
 
 class Table(Crystal):
     def __init__(self, name="Table", width=1000, height=10, thickness=1000, **kwargs):
@@ -172,26 +173,18 @@ dist_R2_M3 = (ydist_R2_M2-ydist_M2_M3) / np.cos(rad(tele_angle2))
 print("Cavity:")
 print(f"g = {g}mm, b = {b}mm")
 
-P1 = Newport_Mirror(name="pump mirror 1", phi=pump_angle, aperture=25.4*2, mirror=True) # pump mirror 1
+P1 = Newport_Mirror(name="pump mirror 1", phi=pump_angle, aperture=25.4*2, thickness=9, mirror=True) # pump mirror 1
 # P1.set_mount(Adapter_2inch(angle=90))
-P2 = Newport_Mirror(name="pump mirror 2", phi=-pump_angle, aperture=25.4*2, mirror=True)  # pump mirror 2
+P2 = Newport_Mirror(name="pump mirror 2", phi=-pump_angle, aperture=25.4*2, thickness=9, mirror=True)  # pump mirror 2
 M1 = Newport_Mirror(name="M1, cut mirror 1", phi=-pump_angle-tele_angle1) # cut mirror 1
-M2 = Newport_Mirror(phi=90, name="M2, cut mirror 2") # cut mirror 2
-M3 = Newport_Mirror(phi=-90+tele_angle2, name="M3, mirror towards tfp 1") # mirror to TFP1
+M2 = Newport_Mirror(name="M2, cut mirror 2", phi=90) # cut mirror 2
+M3 = Newport_Mirror(name="M3, mirror towards tfp 1", phi=-90+tele_angle2) # mirror to TFP1
 M4 = Newport_Mirror(name="M4, after pump mirror 2", phi=pump_angle) # mirror after TFP2
 R1 = Newport_Curved_Mirror(name=f"R1, f={f1:.0f}mm", phi=-180+tele_angle1, radius=r1)
-R2 = Newport_Curved_Mirror(name=f"R2, f={f2:.0f}mm", phi=-180-tele_angle2, radius=r2, aperture=25.4*3)
-TFP1 = Newport_Mirror(name="TFP1 (Input)", phi=-90+deg(TFP_angle), aperture=25.4*2)
-TFP2 = Newport_Mirror(name="TFP2 (Output)", phi=90-deg(TFP_angle), aperture=25.4*2)
+R2 = Newport_Curved_Mirror(name=f"R2, f={f2:.0f}mm", phi=-180-tele_angle2, radius=r2, aperture=25.4*3, thickness=12)
+TFP1 = Newport_Mirror(name="TFP1 (Input)", phi=-90+deg(TFP_angle), aperture=25.4*2, thickness=9)
+TFP2 = Newport_Mirror(name="TFP2 (Output)", phi=90-deg(TFP_angle), aperture=25.4*2, thickness=9)
 pockels_cell = Pockels_Cell_Thick(name="Pockels Cell", mount_name="Pockels_cell_thick")
-
-for mirror in [P1, P2, TFP1, TFP2]:
-    mirror.thickness = 9
-    mirror.set_mount_back_mounted()
-
-for mirror in [M1, M2, M3, M4]:
-    mirror.thickness = 6
-    mirror.set_mount_back_mounted()
 
 Setup = Composition(name="A3")
 Setup.set_light_source(beam)
@@ -340,19 +333,11 @@ Kuehlmount_Alumosilikatglas.freecad_model = load_STL
 
 Kuehlmount2_Alumosilikatglas = deepcopy(Kuehlmount_Alumosilikatglas)
 
-M3_top = Newport_Mirror(phi=180-angle_pump_mirror, name="4inch silver mirror", aperture=25.4*4)
-M3_bot = Newport_Mirror(phi=180+angle_pump_mirror, name="4inch silver mirror 2", aperture=25.4*4)
+M3_top = Newport_Mirror(phi=180-angle_pump_mirror, name="4inch silver mirror", aperture=25.4*4, thickness=22)
+M3_bot = Newport_Mirror(phi=180+angle_pump_mirror, name="4inch silver mirror 2", aperture=25.4*4, thickness=22)
 
-for mirror in [M3_top, M3_bot]:
-    mirror.thickness = 22
-    mirror.set_mount_back_mounted()
-
-M3_top2 = Newport_Mirror(phi=+90+angle_pump_mirror, name="3inch dielectric mirror", aperture=25.4*3, mirror=True)
-M3_bot2 = Newport_Mirror(phi=-90-angle_pump_mirror, name="3inch dielectric mirror 2", aperture=25.4*3)
-
-for mirror in [M3_top2, M3_bot2]:
-    mirror.thickness = 18
-    mirror.set_mount_back_mounted()
+M3_top2 = Newport_Mirror(phi=+90+angle_pump_mirror, name="3inch dielectric mirror", aperture=25.4*3, thickness=18, mirror=True)
+M3_bot2 = Newport_Mirror(phi=-90-angle_pump_mirror, name="3inch dielectric mirror 2", aperture=25.4*3, thickness=18)
 
 LiMgAS_crystal1 = Cylindric_Crystal(name="LiMgAs", aperture=23, thickness=12)
 LiMgAS_crystal2 = Cylindric_Crystal(name="LiMgAs2", aperture=23, thickness=12)
