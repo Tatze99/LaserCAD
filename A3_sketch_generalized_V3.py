@@ -123,6 +123,7 @@ f1 = r1/2
 f2 = r2/2
 
 beam = Beam(radius=5, angle=0)
+beam.draw_dict["transparency"] = 20
 beam.pos=[0,0,0]
 
 if UsePolRotator:
@@ -330,6 +331,7 @@ Kuehlmount_Alumosilikatglas = Component(name="Kuehlmount Alumosilikatglas d23")
 stl_file = rf"{thisfolder}\misc_meshes\Kuehlmount_Alumosilikatglas_d23.stl"
 Kuehlmount_Alumosilikatglas.draw_dict["stl_file"]=stl_file
 Kuehlmount_Alumosilikatglas.freecad_model = load_STL
+Kuehlmount_Alumosilikatglas.draw_dict["color"] = (212/255, 162/255, 78/255)
 
 Kuehlmount2_Alumosilikatglas = deepcopy(Kuehlmount_Alumosilikatglas)
 
