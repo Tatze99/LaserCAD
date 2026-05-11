@@ -234,6 +234,11 @@ Setup.propagate(dist_TFP2_P1)
 Setup.add_on_axis(P1)
 Setup.propagate(pump_dist/2)
 
+x,y,z = P1.get_coordinate_system()
+P1.pos += -7*y
+x,y,z = P2.get_coordinate_system()
+P2.pos += -7*y
+
 dist_to_ideal_imaging = Setup.optical_path_length()+length_diff - cavity_length
 image_distance = dist_R2_M3+xdist_M3_TFP1+TFP_dist+dist_TFP2_P1+pump_dist/2-dist_to_ideal_imaging
 
