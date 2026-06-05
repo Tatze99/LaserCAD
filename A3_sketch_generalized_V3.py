@@ -25,6 +25,24 @@ from copy import deepcopy
 from LaserCAD.moduls import Polarization_Rotator
 from LaserCAD.basic_optics.lens import Thicklens
 
+def deviation_parallel_plate(d, phi=45, n=1.45, n_air=1):
+    """
+    calculate the spatial displacement of a laser beam propagating through a plan-parallel plate with refractive index
+
+    """
+    refraction_angle = np.arcsin(n_air/n * np.sin(rad(phi)))
+
+    return d*np.sin(rad(phi)-refraction_angle)/np.cos(refraction_angle)
+
+def path_length_difference_parallel_plate(d, phi=45, n=1.45, n_air=1):
+    """
+    calculate the difference in path length to the other side of the plate with and without refraction of the beam
+    """
+    refraction_angle = np.arcsin(n_air/n * np.sin(rad(phi)))
+
+    return d/np.cos(refraction_angle)*(1-np.cos(rad(phi)-refraction_angle))
+
+print(path_length_difference_parallel_plate(9.52))
 
 def rad(angle):
     return np.pi/180*angle
@@ -174,9 +192,9 @@ dist_R2_M3 = (ydist_R2_M2-ydist_M2_M3) / np.cos(rad(tele_angle2))
 print("Cavity:")
 print(f"g = {g}mm, b = {b}mm")
 
-P1 = Newport_Mirror(name="pump mirror 1", phi=pump_angle, aperture=25.4*2, thickness=9, mirror=True) # pump mirror 1
+P1 = Newport_Mirror(name="pump mirror 1", phi=pump_angle, aperture=25.4*2, thickness=9.52, mirror=True) # pump mirror 1
 # P1.set_mount(Adapter_2inch(angle=90))
-P2 = Newport_Mirror(name="pump mirror 2", phi=-pump_angle, aperture=25.4*2, thickness=9, mirror=True)  # pump mirror 2
+P2 = Newport_Mirror(name="pump mirror 2", phi=-pump_angle, aperture=25.4*2, thickness=9.52, mirror=True)  # pump mirror 2
 M1 = Newport_Mirror(name="M1, cut mirror 1", phi=-pump_angle-tele_angle1) # cut mirror 1
 M2 = Newport_Mirror(name="M2, cut mirror 2", phi=90) # cut mirror 2
 M3 = Newport_Mirror(name="M3, mirror towards tfp 1", phi=-90+tele_angle2) # mirror to TFP1
@@ -294,21 +312,31 @@ dist_to_first_pump_lens = image_plane_to_pump_module_distance + object_distance
 dist_M2_pump_lens2 = 95
 pump_module_xoffset = 270
 
+parallel_plate_offset = deviation_parallel_plate(9.52, phi=45, n=1.45)
+
 total_pump_length = dist_to_first_pump_lens + focal_length1 + focal_length2 + image_distance + lasermedia_dist
 
 pump_module_separation = 2*image_distance + lasermedia_dist + dist_M2_pump_lens2
-remaining_length = total_pump_length - pump_module_xoffset - dist_M2_pump_lens2 - image_distance - lasermedia_dist/2
-
 y_dist_M2_pump_axis = image_distance + lasermedia_dist/2 + dist_M2_pump_lens2 - pump_module_separation/2
 
-remaining_length1 = remaining_length/2 - y_dist_M2_pump_axis**2/(2*remaining_length)
-remaining_length2 = remaining_length - remaining_length1
-angle_pump_mirror = deg(np.arcsin(y_dist_M2_pump_axis/remaining_length2))
+# bottom module
+remaining_length_bottom = total_pump_length - (pump_module_xoffset-parallel_plate_offset) - dist_M2_pump_lens2 - image_distance - lasermedia_dist/2
 
-beamtop_1 = Ray_Distribution(radius=pump_spot_size/2,angle=1.4*2.08*np.pi/180,wavelength=940E-6, steps=3)
+remaining_length1_bottom = remaining_length_bottom/2 - y_dist_M2_pump_axis**2/(2*remaining_length_bottom)
+remaining_length2_bottom = remaining_length_bottom - remaining_length1_bottom
+angle_pump_mirror_bottom = deg(np.arcsin(y_dist_M2_pump_axis/remaining_length2_bottom))
+
+#top module
+remaining_length_top = total_pump_length - (pump_module_xoffset+parallel_plate_offset) - dist_M2_pump_lens2 - image_distance - lasermedia_dist/2
+
+remaining_length1_top = remaining_length_top/2 - y_dist_M2_pump_axis**2/(2*remaining_length_top)
+remaining_length2_top = remaining_length_top - remaining_length1_top
+angle_pump_mirror_top = deg(np.arcsin(y_dist_M2_pump_axis/remaining_length2_top))
+
+beamtop_1 = Ray_Distribution(radius=pump_spot_size/2,angle=1.6*2.08*np.pi/180,wavelength=940E-6, steps=3)
 beamtop_1.draw_dict["color"] = (255/256,255/256,0.0)
 
-beambot_1 = Ray_Distribution(radius=pump_spot_size/2,angle=1.4*2.08*np.pi/180,wavelength=940E-6, steps=3)
+beambot_1 = Ray_Distribution(radius=pump_spot_size/2,angle=1.6*2.08*np.pi/180,wavelength=940E-6, steps=3)
 beambot_1.draw_dict["color"] = (255/256,255/256,0.0)
 
 thicklens_xdeviation = getattr(Lens_pump_top_f1, "h1", 0) + getattr(Lens_pump_top_f1, "h2", 0) + getattr(Lens_pump_top_f1, "thickness", 0) 
@@ -340,11 +368,11 @@ Kuehlmount_Alumosilikatglas.draw_dict["color"] = (212/255, 162/255, 78/255)
 
 Kuehlmount2_Alumosilikatglas = deepcopy(Kuehlmount_Alumosilikatglas)
 
-M3_top = Newport_Mirror(phi=180-angle_pump_mirror, name="4inch silver mirror", aperture=25.4*4, thickness=22)
-M3_bot = Newport_Mirror(phi=180+angle_pump_mirror, name="4inch silver mirror 2", aperture=25.4*4, thickness=22)
+M3_top = Newport_Mirror(phi=180-angle_pump_mirror_top, name="4inch silver mirror", aperture=25.4*4, thickness=22)
+M3_bot = Newport_Mirror(phi=180+angle_pump_mirror_bottom, name="4inch silver mirror 2", aperture=25.4*4, thickness=22)
 
-M3_top2 = Newport_Mirror(phi=+90+angle_pump_mirror, name="3inch dielectric mirror", aperture=25.4*3, thickness=18, mirror=True)
-M3_bot2 = Newport_Mirror(phi=-90-angle_pump_mirror, name="3inch dielectric mirror 2", aperture=25.4*3, thickness=18)
+M3_top2 = Newport_Mirror(phi=+90+angle_pump_mirror_top, name="3inch dielectric mirror", aperture=25.4*3, thickness=18, mirror=True)
+M3_bot2 = Newport_Mirror(phi=-90-angle_pump_mirror_bottom, name="3inch dielectric mirror 2", aperture=25.4*3, thickness=18)
 
 LiMgAS_crystal1 = Cylindric_Crystal(name="LiMgAs", aperture=23, thickness=12)
 LiMgAS_crystal2 = Cylindric_Crystal(name="LiMgAs2", aperture=23, thickness=12)
@@ -356,9 +384,9 @@ Pump_top.propagate(dist_to_first_pump_lens)
 Pump_top.propagate(getattr(Lens_pump_top_f1, "h1", 0))
 Pump_top.add_on_axis(Lens_pump_top_f1)
 Pump_top.propagate(getattr(Lens_pump_top_f1, "h2", 0))
-Pump_top.propagate(pump_module_xoffset - dist_to_first_pump_lens + remaining_length1)
+Pump_top.propagate(pump_module_xoffset - parallel_plate_offset - dist_to_first_pump_lens + remaining_length1_top)
 Pump_top.add_on_axis(M3_top)
-Pump_top.propagate(remaining_length2)
+Pump_top.propagate(remaining_length2_top)
 Pump_top.add_on_axis(M3_top2)
 Pump_top.propagate(dist_M2_pump_lens2)
 Pump_top.propagate(getattr(Lens_pump_top_f2, "h1", 0))
@@ -377,9 +405,9 @@ Pump_bot.propagate(dist_to_first_pump_lens)
 Pump_bot.propagate(getattr(Lens_pump_bot_f1, "h1", 0))
 Pump_bot.add_on_axis(Lens_pump_bot_f1)
 Pump_bot.propagate(getattr(Lens_pump_bot_f1, "h2", 0))
-Pump_bot.propagate(pump_module_xoffset - dist_to_first_pump_lens + remaining_length1)
+Pump_bot.propagate(pump_module_xoffset + parallel_plate_offset - dist_to_first_pump_lens + remaining_length1_bottom)
 Pump_bot.add_on_axis(M3_bot)
-Pump_bot.propagate(remaining_length2)
+Pump_bot.propagate(remaining_length2_bottom)
 Pump_bot.add_on_axis(M3_bot2)
 Pump_bot.propagate(dist_M2_pump_lens2)
 Pump_bot.propagate(getattr(Lens_pump_bot_f2, "h1", 0))
