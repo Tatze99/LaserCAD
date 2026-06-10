@@ -18,12 +18,20 @@ from LaserCAD.basic_optics import Mirror, Beam, Ray_Distribution, Composition, C
 from LaserCAD.basic_optics import Grating, Opt_Element
 import matplotlib.pyplot as plt
 from LaserCAD.freecad_models.utils import thisfolder, load_STL
-from LaserCAD.non_interactings import Crystal, Lambda_Plate
+from LaserCAD.non_interactings import Crystal, Lambda_Plate, Iris
 from LaserCAD.non_interactings.pockels_cell import Pockels_Cell_Thick
 from LaserCAD.basic_optics import Composed_Mount,Unit_Mount,Lens,Post, export_to_TikZ, print_post_positions
 from copy import deepcopy
 from LaserCAD.moduls import Polarization_Rotator
 from LaserCAD.basic_optics.lens import Thicklens
+from LaserCAD.basic_optics import ThickBeamsplitter
+from LaserCAD.moduls import Transmission_Disk
+
+def rad(angle):
+    return np.pi/180*angle
+
+def deg(angle):
+    return 180/np.pi*angle
 
 def deviation_parallel_plate(d, phi=45, n=1.45, n_air=1):
     """
@@ -42,20 +50,13 @@ def path_length_difference_parallel_plate(d, phi=45, n=1.45, n_air=1):
 
     return d/np.cos(refraction_angle)*(1-np.cos(rad(phi)-refraction_angle))
 
-print(path_length_difference_parallel_plate(9.52))
-
-def rad(angle):
-    return np.pi/180*angle
-
-def deg(angle):
-    return 180/np.pi*angle
 
 def get_TFP_distances(TFP_ydist, TFP_angle):
     TFP_xdist = TFP_ydist*np.tan(TFP_angle)
     TFP_dist = np.sqrt(TFP_ydist**2 + TFP_xdist**2)
     TFP_delta = TFP_dist - TFP_ydist - TFP_xdist
     
-    TFP_Lam = 0.1*TFP_dist
+    TFP_Lam = 0.2*TFP_dist
     Lam_PC = 0.7*TFP_dist  # 0.6 before
     dist_PC_TFP = TFP_dist - TFP_Lam - Lam_PC
     
@@ -248,7 +249,12 @@ Setup.propagate(dist_PC_TFP)
 Setup.add_on_axis(TFP2)
 dist_TFP2_P1 = abs(TFP2.pos[0] - pos_start[0])
 
-Setup.propagate(dist_TFP2_P1)
+iris_dist = 200
+Setup.propagate(iris_dist)
+Setup.add_on_axis(Iris(name="Iris 1 after TFP2"))
+Setup.propagate(dist_TFP2_P1-2*iris_dist)
+Setup.add_on_axis(Iris(name="Iris 2 after TFP2"))
+Setup.propagate(iris_dist)
 Setup.add_on_axis(P1)
 Setup.propagate(pump_dist/2)
 
@@ -377,6 +383,25 @@ M3_bot2 = Newport_Mirror(phi=-90-angle_pump_mirror_bottom, name="3inch dielectri
 LiMgAS_crystal1 = Cylindric_Crystal(name="LiMgAs", aperture=23, thickness=12)
 LiMgAS_crystal2 = Cylindric_Crystal(name="LiMgAs2", aperture=23, thickness=12)
 
+Dichroic_top = Transmission_Disk(name="Dichroic Top", AOI=0, thickness=9.52, refractive_index=1.45, aperture=25.4*2)
+Dichroic_top.set_geom(P2.get_geom())
+Dichroic_top.rotate((0,0,1), np.pi)
+Dichroic_top.pos -= Dichroic_top.normal*Dichroic_top.thickness
+
+Dichroic_bot = Transmission_Disk(name="Dichroic Bot", AOI=0, thickness=9.52, refractive_index=1.45, aperture=25.4*2)
+Dichroic_bot.set_geom(P1.get_geom())
+Dichroic_bot.rotate((0,0,1), np.pi)
+Dichroic_bot.pos -= Dichroic_bot.normal*Dichroic_bot.thickness
+
+for elem in Dichroic_bot.non_opticals:
+    elem.invisible = True
+    elem.Mount.invisible = True
+
+for elem in Dichroic_top.non_opticals:
+    elem.invisible = True
+    elem.Mount.invisible = True
+
+
 Pump_top.pos += offset_axis
 print(f"PM19 top position = ({Pump_top.pos[0]/10:.1f}cm, {Pump_top.pos[1]/10:.1f}cm, {Pump_top.pos[2]/10:.1f}cm)")
 Pump_top.add_on_axis(Laser_Head_in)
@@ -392,7 +417,13 @@ Pump_top.propagate(dist_M2_pump_lens2)
 Pump_top.propagate(getattr(Lens_pump_top_f2, "h1", 0))
 Pump_top.add_on_axis(Lens_pump_top_f2)
 Pump_top.propagate(getattr(Lens_pump_top_f2, "h2", 0))
-Pump_top.propagate(image_distance-6)
+
+len1 = Pump_top.optical_path_length()
+Pump_top.add_supcomposition_fixed(Dichroic_top)
+Pump_top.recompute_optical_axis()
+len2 = Pump_top.optical_path_length()
+
+Pump_top.propagate(image_distance-6-(len2-len1))
 Pump_top.add_on_axis(Kuehlmount_Alumosilikatglas)
 Pump_top.add_on_axis(LiMgAS_crystal1)
 Pump_top.propagate(6)
@@ -413,7 +444,13 @@ Pump_bot.propagate(dist_M2_pump_lens2)
 Pump_bot.propagate(getattr(Lens_pump_bot_f2, "h1", 0))
 Pump_bot.add_on_axis(Lens_pump_bot_f2)
 Pump_bot.propagate(getattr(Lens_pump_bot_f2, "h2", 0))
-Pump_bot.propagate(image_distance-6)
+
+len1 = Pump_bot.optical_path_length()
+Pump_bot.add_supcomposition_fixed(Dichroic_bot)
+Pump_bot.recompute_optical_axis()
+len2 = Pump_bot.optical_path_length()
+
+Pump_bot.propagate(image_distance-6-(len2-len1))
 Pump_bot.add_on_axis(Kuehlmount2_Alumosilikatglas)
 Pump_bot.add_on_axis(LiMgAS_crystal2)
 Pump_bot.propagate(6)
