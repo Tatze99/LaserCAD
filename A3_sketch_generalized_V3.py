@@ -19,7 +19,7 @@ from LaserCAD.basic_optics import Grating, Opt_Element
 import matplotlib.pyplot as plt
 from LaserCAD.freecad_models.utils import thisfolder, load_STL
 from LaserCAD.non_interactings import Crystal, Lambda_Plate, Iris
-from LaserCAD.non_interactings.pockels_cell import Pockels_Cell_Thick
+from LaserCAD.non_interactings.pockels_cell import Pockels_Cell
 from LaserCAD.basic_optics import Composed_Mount,Unit_Mount,Lens,Post, export_to_TikZ, print_post_positions
 from copy import deepcopy
 from LaserCAD.moduls import Polarization_Rotator
@@ -204,7 +204,7 @@ R1 = Newport_Curved_Mirror(name=f"R1, f={f1:.0f}mm", phi=-180+tele_angle1, radiu
 R2 = Newport_Curved_Mirror(name=f"R2, f={f2:.0f}mm", phi=-180-tele_angle2, radius=r2, aperture=25.4*3, thickness=12)
 TFP1 = Newport_Mirror(name="TFP1 (Input)", phi=-90+deg(TFP_angle), aperture=25.4*2, thickness=9)
 TFP2 = Newport_Mirror(name="TFP2 (Output)", phi=90-deg(TFP_angle), aperture=25.4*2, thickness=9)
-pockels_cell = Pockels_Cell_Thick(name="Pockels Cell", mount_name="Pockels_cell_thick")
+pockels_cell = Pockels_Cell(name="Pockels Cell", mount_name="Pockels_cell_thick")
 
 Setup = Composition(name="A3")
 Setup.set_light_source(beam)
@@ -272,9 +272,9 @@ print(f"optical path length = {Setup.optical_path_length()+length_diff:.2f}mm\n"
 
 def image_telescope(f1, f2, g=None, b=None):
     if b is None and g is not None:
-        return f1/f2 * (f1 + f2 - g * f1/f2)
+        return f2/f1 * (f1 + f2 - g * f2/f1)
     elif g is None and b is not None:
-        return f2/f1 * (f1 + f2 - b * f2/f1)
+        return f1/f2 * (f1 + f2 - b * f1/f2)
     else:       
         raise ValueError("Either g or b must be provided, but not both.")
 

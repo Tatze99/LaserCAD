@@ -125,6 +125,88 @@ def test_composition(offset=0, f=85, aperture=75, edge_thickness=3, biconvex=Fal
 
   return Comp, IP2
 
+def image_telescope(f1, f2, g=None, b=None):
+    if b is None and g is not None:
+        return f2/f1 * (f1 + f2 - g * f2/f1)
+    elif g is None and b is not None:
+        return f1/f2 * (f1 + f2 - b * f1/f2)
+    else:       
+        raise ValueError("Either g or b must be provided, but not both.")
+    
+def A3_sketch_V3(f1=300, f2=100, object_distance=120, image_distance=None, aperture=75, offset=0, biconvex=False, draw_spot_diagram=True, save=False, add_telescope=False, add_text="", add_propagation=0, prop_to_second_pump=False):
+
+  if image_distance is None:
+    image_distance = image_telescope(f1, f2, g=object_distance)
+    print(f"object distance: {object_distance:.2f}mm, image distance: {image_distance:.2f}mm")
+  pump_magnification = f2/f1  
+  file_name = generate_file_name(f1, biconvex, aperture, pump_magnification, add_telescope, add_text, add_propagation)
+  title = generate_title(f1, biconvex, aperture, pump_magnification)
+
+  pump_spot_size = 15 # mm
+  final_spot_size = 1*pump_spot_size * pump_magnification
+
+  Lens1 = Thicklens(f=f1, n=1.515, aperture=aperture, biconvex=biconvex)
+  Lens2 = Thicklens(f=f2, n=1.515, aperture=aperture, biconvex=biconvex)
+
+  print(Lens1.radius1(), Lens1.radius2(), Lens1.thickness)
+  print(Lens2.radius1(), Lens2.radius2(), Lens2.thickness)
+
+  # Lens1 = Lens(f=f1, aperture=aperture)
+  # Lens2 = Lens(f=f2, aperture=aperture)
+
+  if not hasattr(Lens1, 'h1') or not hasattr(Lens1, 'h2'):
+    Lens1.h1 = 0
+    Lens1.h2 = 0
+  if not hasattr(Lens2, 'h1') or not hasattr(Lens2, 'h2'):
+    Lens2.h1 = 0
+    Lens2.h2 = 0
+  steps = 3 if freecad_da else 9
+
+  Comp = Composition()
+  Comp.pos += (0, -offset,50)
+  Beam = Ray_Distribution(radius=pump_spot_size/2,angle=1.6*2.08*np.pi/180,wavelength=940E-6, steps=steps)
+  Comp.set_light_source(Beam)
+  Comp.propagate(0)
+  IP1 = Intersection_plane()
+  Comp.add_on_axis(IP1)
+  IP1.draw()
+  if draw_spot_diagram and not freecad_da: 
+    dirname = os.path.dirname(file_name)
+    IP1.spot_diagram(Comp._beams[-1], save=save, filename=os.path.join(dirname, "initial_beam_spot_diagram.pdf"), title="Initial Beam Spot Diagram")
+
+  Comp.propagate(object_distance+Lens1.h1)
+  Comp.add_on_axis(Lens1)
+  Comp.propagate(Lens1.h2+f1+f2+Lens2.h1)
+  Comp.add_on_axis(Lens2)
+  Comp.propagate(image_distance+Lens2.h2+add_propagation)
+
+  print(f"principal planes: Lens1 h1 = {Lens1.h1:.2f}mm, Lens1 h2 = {Lens1.h2:.2f}mm, Lens2 h1 = {Lens2.h1:.2f}mm, Lens2 h2 = {Lens2.h2:.2f}mm")
+  IP2 = Intersection_plane()
+  Comp.add_on_axis(IP2)
+  IP2.draw()
+  # Comp.propagate(100)
+  Comp.draw()
+
+  if draw_spot_diagram and not freecad_da: 
+    point_x, point_y = IP2.spot_diagram(Comp._beams[-1], save=save, filename=file_name, title=title, draw_rectangle=True, rectangle_size=(final_spot_size, final_spot_size))
+    # print(f"number of rays = {len(point_x)}")
+    # print(f"percentage of rays inside rectangle = {calc_target_ray_number(point_x, point_y, final_spot_size):.2f}%")
+    # print(f"target spot size = {final_spot_size:.2f}mm")
+
+    final_spot_size_array = np.linspace(0, pump_spot_size, 100)
+    percentage_array = [calc_target_ray_number(point_x, point_y, s) for s in final_spot_size_array]
+    plt.figure()
+    plt.plot(final_spot_size_array, percentage_array, label=f"percentage at target = {calc_target_ray_number(point_x, point_y, final_spot_size):.2f}%")
+    plt.xlabel("Final Spot Size (mm)")
+    plt.ylabel("Percentage of Rays inside Spot Size (%)")
+    plt.axvline(final_spot_size, color='red', linestyle='--', label=f'Target Spot Size={final_spot_size:.2f}mm')
+    plt.legend()
+    # if save:
+    #   plt.savefig(file_name.replace("spot_diagram", "percentage_vs_spot_size").replace(".pdf", ".png"), dpi=300)
+  # test_radius(Lens1)
+
+  return Comp, IP2
+
 def calc_target_ray_number(point_x, point_y, final_spot_size):
   return np.sum( (np.abs(point_x)<=final_spot_size/2) & (np.abs(point_y)<=final_spot_size/2) ) / len(point_x) * 100
 
@@ -139,20 +221,25 @@ def generate_title(focal_length, biconvex, aperture, pump_magnification):
   lens_type = "Biconvex" if biconvex else "Planoconvex"
   return f"Spot Diagram of {lens_type} Lens (f={focal_length}mm, D={aperture:.1f}mm, M={pump_magnification})"
 
-if freecad_da:
-  clear_doc()
 
-save = False
+if __name__ == "__main__":
+  if freecad_da:
+    clear_doc()
 
-set_plot_params()
+  save = False
+  draw_spot_diagram = False
+  set_plot_params()
 
-aperture = 3*inch
-focal_length = 85
-# Comp1, IP3 = test_composition(offset=0, f=focal_length, aperture=aperture, save=save, draw_spot_diagram=True, add_telescope=True)
-# Comp2, IP4 = test_composition(offset=0, f=focal_length, aperture=aperture, save=save, draw_spot_diagram=True, add_telescope=False, add_text="", add_propagation=17)
-# Comp2, IP2 = test_composition(offset=100, f=focal_length, aperture=aperture, biconvex=True, save=save)
+  Comp, IP = A3_sketch_V3(f1=300, f2=100, object_distance=120, aperture=75, add_propagation=0, draw_spot_diagram=draw_spot_diagram, save=save)
+  # Comp2, IP2 = A3_sketch_V3(f1=500, f2=150, object_distance=200, aperture=75, add_propagation=-8, offset=100, draw_spot_diagram=draw_spot_diagram, save=save)
 
-Comp2, IP4 = test_composition(offset=0, f=focal_length, aperture=aperture, save=save, draw_spot_diagram=True, add_telescope=False, prop_to_second_pump=True, add_text="prop_to_second_pump")
+  #### OLD PUMP SETUP
+  # aperture = 3*inch
+  # focal_length = 85
+  # Comp1, IP3 = test_composition(offset=0, f=focal_length, aperture=aperture, save=save, draw_spot_diagram=True, add_telescope=True)
+  # Comp2, IP4 = test_composition(offset=0, f=focal_length, aperture=aperture, save=save, draw_spot_diagram=True, add_telescope=False, add_text="", add_propagation=17)
+  # Comp2, IP2 = test_composition(offset=200, f=85, aperture=3*inch, biconvex=False, save=save)
+  # Comp2, IP4 = test_composition(offset=0, f=focal_length, aperture=aperture, save=save, draw_spot_diagram=True, add_telescope=False, prop_to_second_pump=True, add_text="prop_to_second_pump")
 
-if freecad_da:
-  setview()
+  if freecad_da:
+    setview()
