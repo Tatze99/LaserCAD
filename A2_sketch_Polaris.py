@@ -16,7 +16,8 @@ from LaserCAD.basic_optics import Grating, Opt_Element, Post, Unit_Mount, Compos
 import matplotlib.pyplot as plt
 from LaserCAD.freecad_models.utils import thisfolder, load_STL
 from LaserCAD.non_interactings import Faraday_Isolator, Pockels_Cell, Lambda_Plate
-from A3_sketch_generalized_V3 import Newport_Mirror, Newport_Curved_Mirror
+from LaserCAD.basic_optics.mirror import Newport_Mirror, Newport_Curved_Mirror
+from LaserCAD.basic_optics.mount import Adapter_1inch
 from LaserCAD.non_interactings.pockels_cell import Pockels_Cell
 from LaserCAD.moduls import Polarization_Rotator
 from Geometrical_optics import CurvedMirror, Lens, FreeSpacePropagation, OpticalSetup, beam_radius_from_q
@@ -34,22 +35,6 @@ CM_angle = 3
 M1_angle = 87 - PM_angle
 M2_angle = 87 - CM_angle
 TFP_angle = 66
-
-class Adapter_1inch(Composed_Mount):
-  def __init__(self, angle=0, post="1inch_post", model="U100-A2K"):
-    super().__init__()
-    um = Unit_Mount()
-    um.model = "1inch_adapter"
-    um.path = thisfolder + "misc_meshes/"
-    um.docking_obj.pos += (6.5,38,0) # from manual adjustments in FreeCAD
-    um.is_horizontal = False
-    um.draw_dict["color"] = (0.3,0.3,0.3)
-    self.add(um)
-    self.post_model = post
-    self.model = model
-    um.rotate(vec=um.normal, phi=angle*np.pi/180)
-    self.add(Unit_Mount(model=model))
-    self.add(Post(model=post))
 
 def motorized_TSF():
     Housing = Unit_Mount("Spiegelhalter_160021_V1")

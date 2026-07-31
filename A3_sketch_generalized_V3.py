@@ -126,6 +126,14 @@ class Cylindric_Crystal(Component):
     self.freecad_model = model_mirror
     self.pos += offset_axis
 
+class Beam_Composition(Composition):
+  def __init__(self, name="Beam_Composition", light_source=None, position=None, **kwargs):
+    super().__init__(name=name, **kwargs)
+    if light_source:
+      self.set_light_source(light_source)
+    if position:
+      self.pos += position
+
 vacuum_tube = Component(name="Vacuum Tube")
 vacuum_tube.draw_dict["stl_file"]= rf"{thisfolder}\mount_meshes\special_mount\Vacuum_Tube_1300mm.stl"
 vacuum_tube.freecad_model = load_STL
@@ -206,9 +214,7 @@ TFP1 = Newport_Mirror(name="TFP1 (Input)", phi=-90+deg(TFP_angle), aperture=25.4
 TFP2 = Newport_Mirror(name="TFP2 (Output)", phi=90-deg(TFP_angle), aperture=25.4*2, thickness=9)
 pockels_cell = Pockels_Cell(name="Pockels Cell", mount_name="Pockels_cell_thick")
 
-Setup = Composition(name="A3")
-Setup.set_light_source(beam)
-Setup.pos += offset_axis
+Setup = Beam_Composition(name="A3", light_source=beam, position=offset_axis)
 
 pos_start = Setup.pos.copy()
 Setup.normal = (0,1,0)
@@ -339,22 +345,27 @@ remaining_length1_top = remaining_length_top/2 - y_dist_M2_pump_axis**2/(2*remai
 remaining_length2_top = remaining_length_top - remaining_length1_top
 angle_pump_mirror_top = deg(np.arcsin(y_dist_M2_pump_axis/remaining_length2_top))
 
-beamtop_1 = Ray_Distribution(radius=pump_spot_size/2,angle=1.6*2.08*np.pi/180,wavelength=940E-6, steps=3)
-beamtop_1.draw_dict["color"] = (255/256,255/256,0.0)
+class Pump_beam(Ray_Distribution):
+    def __init__(self, radius=pump_spot_size/2, angle=1.9*2.08*np.pi/180, wavelength=940E-6, steps=3):
+        super().__init__(radius=radius, angle=angle, wavelength=wavelength, steps=steps)
+        self.draw_dict["color"] = (255/256,255/256,0.0)
 
-beambot_1 = Ray_Distribution(radius=pump_spot_size/2,angle=1.6*2.08*np.pi/180,wavelength=940E-6, steps=3)
-beambot_1.draw_dict["color"] = (255/256,255/256,0.0)
+beamtop_2 = Pump_beam()
+beambot_2 = Pump_beam()
+
+beambot_1 = Pump_beam()
+beamtop_1 = Pump_beam()
+
 
 thicklens_xdeviation = getattr(Lens_pump_top_f1, "h1", 0) + getattr(Lens_pump_top_f1, "h2", 0) + getattr(Lens_pump_top_f1, "thickness", 0) 
 thicklens_ydeviation = getattr(Lens_pump_top_f2, "h1", 0) + getattr(Lens_pump_top_f2, "h2", 0) + getattr(Lens_pump_top_f2, "thickness", 0) 
 
-Pump_top = Composition(name="PM19 top")
-Pump_top.set_light_source(beamtop_1)
-Pump_top.pos -= (pump_module_xoffset+thicklens_xdeviation,-pump_module_separation/2-thicklens_ydeviation,0)
+pump_yoffset = pump_module_separation/2 + thicklens_ydeviation
+pump_xoffset = pump_module_xoffset + thicklens_xdeviation - image_plane_to_pump_module_distance
 
-Pump_bot = Composition(name="PM19 bot")
-Pump_bot.set_light_source(beambot_1)
-Pump_bot.pos -= (pump_module_xoffset+thicklens_xdeviation,pump_module_separation/2+thicklens_ydeviation,0)
+Pump_top = Beam_Composition(name="PM19 top", light_source=beamtop_1, position=(-pump_xoffset, pump_yoffset,0))
+
+Pump_bot = Beam_Composition(name="PM19 bot", light_source=beambot_1, position=(-pump_xoffset, -pump_yoffset,0))
 
 Laser_Head_in = Component(name="laser Pump Module PM19 bot")
 stl_file = rf"{thisfolder}\misc_meshes\PM19_2.stl"
@@ -365,6 +376,25 @@ Laser_Head_out = Component(name="laser Pump Module PM19 top")
 stl_file = rf"{thisfolder}\misc_meshes\PM19_2.stl"
 Laser_Head_out.draw_dict["stl_file"]=stl_file
 Laser_Head_out.freecad_model = load_STL
+
+## backpropagation from image plane to pump module 
+Pump_top2 = Beam_Composition(name="PM19 top 2", light_source=beamtop_2, position=(-pump_xoffset, pump_yoffset,0))
+Pump_top2.pos += offset_axis
+Pump_top2.normal = -Pump_top2.normal
+Pump_top2.propagate(image_plane_to_pump_module_distance)
+# Pump_top2.normal = -Pump_top2.normal
+Pump_top2.add_on_axis(Laser_Head_in)
+Laser_Head_in.rotate((0,0,1), np.pi)
+
+
+Pump_bot2 = Beam_Composition(name="PM19 bot 2", light_source=beambot_2, position=(-pump_xoffset, -pump_yoffset,0))
+Pump_bot2.pos += offset_axis
+Pump_bot2.normal = -Pump_bot2.normal 
+Pump_bot2.propagate(image_plane_to_pump_module_distance)
+# Pump_bot2.normal = -Pump_bot2.normal
+Pump_bot2.add_on_axis(Laser_Head_out)
+Laser_Head_out.rotate((0,0,1), np.pi)
+####
 
 Kuehlmount_Alumosilikatglas = Component(name="Kuehlmount Alumosilikatglas d23")
 stl_file = rf"{thisfolder}\misc_meshes\Kuehlmount_Alumosilikatglas_d23.stl"
@@ -404,8 +434,8 @@ for elem in Dichroic_top.non_opticals:
 
 Pump_top.pos += offset_axis
 print(f"PM19 top position = ({Pump_top.pos[0]/10:.1f}cm, {Pump_top.pos[1]/10:.1f}cm, {Pump_top.pos[2]/10:.1f}cm)")
-Pump_top.add_on_axis(Laser_Head_in)
-Pump_top.propagate(dist_to_first_pump_lens)
+# Pump_top.add_on_axis(Laser_Head_in)
+Pump_top.propagate(object_distance)
 Pump_top.propagate(getattr(Lens_pump_top_f1, "h1", 0))
 Pump_top.add_on_axis(Lens_pump_top_f1)
 Pump_top.propagate(getattr(Lens_pump_top_f1, "h2", 0))
@@ -431,8 +461,8 @@ Pump_top.propagate(6)
 
 Pump_bot.pos += offset_axis
 print(f"PM19 bot position = ({Pump_bot.pos[0]/10:.1f}cm, {Pump_bot.pos[1]/10:.1f}cm, {Pump_bot.pos[2]/10:.1f}cm)\n")
-Pump_bot.add_on_axis(Laser_Head_out)
-Pump_bot.propagate(dist_to_first_pump_lens)
+# Pump_bot.add_on_axis(Laser_Head_out)
+Pump_bot.propagate(object_distance)
 Pump_bot.propagate(getattr(Lens_pump_bot_f1, "h1", 0))
 Pump_bot.add_on_axis(Lens_pump_bot_f1)
 Pump_bot.propagate(getattr(Lens_pump_bot_f1, "h2", 0))
@@ -478,9 +508,11 @@ if __name__ == "__main__":
         clear_doc()
         Setup.draw()
         Pump_top.draw()
+        Pump_top2.draw()
         Pump_bot.draw()
-        table.draw()
-        table2.draw()
+        Pump_bot2.draw()
+        # table.draw()
+        # table2.draw()
         # setview()
 
     else:
