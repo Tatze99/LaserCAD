@@ -26,7 +26,7 @@ def dont():
     return None
 
 
-beam = Beam(radius=1, angle=0)
+beam = Beam(radius=1.5, angle=0.0002, wavelength=1.03e-3, name="main beam")
 from LaserCAD.basic_optics import Gaussian_Beam
 
 # define angles and components
@@ -56,7 +56,7 @@ pockels_cell = Pockels_Cell(name="Pockels Cell", mount_name="pockels_cell")
 Pol_Rotater = Polarization_Rotator()
 
 # Prepare the setup
-radius = 8000
+radius = 10000
 
 PM = Newport_Mirror(phi = 180 - PM_angle, aperture=2*inch, name="pump mirror")
 M1 = Newport_Mirror(phi = -M1_angle, name="M1")
@@ -85,10 +85,12 @@ Setup.propagate(l1)
 Setup.add_on_axis(M1)
 Setup.propagate(115)
 Setup.add_on_axis(motorized_TSF())
+L_TSF1 = Setup.optical_path_length()
 Setup.propagate(l2-115)
 Setup.add_on_axis(M2)
 Setup.propagate(145)
 Setup.add_on_axis(motorized_TSF())
+L_TSF2 = Setup.optical_path_length()
 Setup.propagate(l3-145)
 Setup.add_on_axis(CM)
 L1 = Setup.optical_path_length()
@@ -100,6 +102,7 @@ Setup.add_supcomposition_on_axis(Pol_Rotater)
 Setup.propagate(200)
 
 Setup.add_on_axis(pockels_cell)
+L_Pockels = Setup.optical_path_length()
 pockels_cell.rotate((0,0,1), np.pi)
 pockels_cell.rotate(pockels_cell.normal, np.pi)
 
@@ -133,14 +136,28 @@ if __name__ == "__main__":
         print(f"initial q-parameter: {setup.get_initial_q()}")
     
         print(f"total_matrix: {setup.get_total_matrix()}")
-        print(f"matrix at z=3200: {setup.get_matrix_at(3201)}")
-        positions = np.linspace(0, 3200, 100)
+        print(f"cavity length: {L1+L2} mm")
+        positions = np.linspace(0, L1+L2, 100)
         q_values = np.array([setup.get_q_at(z) for z in positions])
         # print(q_values)
-    
+        matrix = np.array(setup.get_total_matrix()).astype(np.float64)
+
+        element_positions = [0, L_TSF1, L_TSF2, L_TSF2+250, L_Pockels]
+        element_width = [beam_radius_from_q(q_values[np.argmin(np.abs(positions - pos))], wavelength=1.03e-3) for pos in element_positions]
+
+
         beam_sizes = [beam_radius_from_q(q, wavelength=1.03e-3) for q in q_values]
+        element_names = ["pump mirror", "TSF1", "TSF2", "TSF1 (new)", "Pockels cell"]
         # print(beam_sizes)
-        plt.figure()
+        plt.figure(figsize=(8,4))
         plt.plot(positions, beam_sizes)
+        for pos, size, name in zip(element_positions, element_width, element_names):
+            plt.plot(pos, size, 'o', label=name + f", {np.pi*size**2:.2f} mm²")
+        plt.xlabel("Position along the cavity (mm)")
+        plt.ylabel("Beam radius w(z) (mm)")
+        plt.grid()
+        plt.legend()
+        plt.title(f"Beam radius for R={radius*1e-3} m")
+        plt.savefig(f"beam_radius_R_{radius*1e-3:.2f}m.svg", bbox_inches='tight', dpi=300)
 
   
