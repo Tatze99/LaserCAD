@@ -37,10 +37,14 @@ if __name__ == "__main__":
   if freecad_da:
     clear_doc()
   stretcher1 = stretcher_test()
-  stretcher1.draw()
+#   stretcher1.draw()
 
   print()
   print("Stretcher GDD:", np.round(stretcher1.GDD * 1e30), "fs^2")
   print("Stretcher TOD:", np.round(stretcher1.TOD * 1e45), "fs^3")
+  print("Stretcher theta (diffraction):", np.round(stretcher1.theta * 180/np.pi, 2), "°")
+  print("Stretcher gamma (input):", np.round(stretcher1.gamma * 180/np.pi, 2), "°")
+
+
 #   if freecad_da:
 #     setview()

@@ -8,10 +8,11 @@ Created on Mon Jul 27 14:13:00 2026
 
 import numpy as np
 import sys
+import os
 from sympy import Matrix
 
 from LaserCAD.freecad_models import clear_doc, setview, freecad_da
-from LaserCAD.basic_optics import Mirror, Beam, Composition, Component, inch, Curved_Mirror, Ray, Geom_Object
+from LaserCAD.basic_optics import Mirror, Beam, Composition, Component, inch, Curved_Mirror, Ray, Geom_Object, export_to_TikZ
 from LaserCAD.basic_optics import Grating, Opt_Element, Post, Unit_Mount, Composed_Mount
 import matplotlib.pyplot as plt
 from LaserCAD.freecad_models.utils import thisfolder, load_STL
@@ -19,13 +20,13 @@ from LaserCAD.non_interactings import Faraday_Isolator, Pockels_Cell, Lambda_Pla
 from LaserCAD.basic_optics.mirror import Newport_Mirror, Newport_Curved_Mirror
 from LaserCAD.basic_optics.mount import Adapter_1inch
 from LaserCAD.non_interactings.pockels_cell import Pockels_Cell
-from LaserCAD.moduls import Polarization_Rotator
+from LaserCAD.moduls import Polarization_Rotator, Motorized_TSF
 from Geometrical_optics import CurvedMirror, Lens, FreeSpacePropagation, OpticalSetup, beam_radius_from_q
   
 def dont():
     return None
 
-
+Folder = os.path.dirname(os.path.abspath(__file__))
 beam = Beam(radius=1.5, angle=0.0002, wavelength=1.03e-3, name="main beam")
 from LaserCAD.basic_optics import Gaussian_Beam
 
@@ -36,24 +37,8 @@ M1_angle = 87 - PM_angle
 M2_angle = 87 - CM_angle
 TFP_angle = 66
 
-def motorized_TSF():
-    Housing = Unit_Mount("Spiegelhalter_160021_V1")
-    # Housing.draw_dict["color"]=(0.2, 0.2, 0.2)
-    # Housing.docking_obj.pos += (33.5,9.2, -37.99)
-    # Housing.docking_obj.normal = (0,0,1)
-
-    Rotator_box = Composed_Mount()
-    Rotator_box.add(Housing)
-    Rotator_box.add(Post())
-    Rotator_housing=Component()
-    Rotator_housing.draw_dict["stl_file"]="dont_draw"
-    Rotator_housing.freecad_model = load_STL
-    Rotator_housing.Mount = Rotator_box
-
-    return Rotator_housing
-
 pockels_cell = Pockels_Cell(name="Pockels Cell", mount_name="pockels_cell")
-Pol_Rotater = Polarization_Rotator()
+Pol_Rotater = Polarization_Rotator(flip=True)
 
 # Prepare the setup
 radius = 10000
@@ -66,6 +51,8 @@ M2 = Newport_Mirror(phi = M2_angle, name="M2")
 CM = Newport_Curved_Mirror(phi = - 180 + CM_angle, radius=radius, name="CM")
 TFP1 = Newport_Mirror(phi = -180 + 2 * TFP_angle, aperture=2*inch, name="TFP1")
 TFP2 = Newport_Mirror(phi =  180 - 2 * TFP_angle, aperture=2*inch, name="TFP2")
+
+M1_in = Newport_Mirror(phi = 270 - 2 * TFP_angle, name="M1_in")
 
 l1 = 565
 l2 = 325 - 8.3
@@ -84,12 +71,12 @@ Setup.add_on_axis(PM)
 Setup.propagate(l1)
 Setup.add_on_axis(M1)
 Setup.propagate(115)
-Setup.add_on_axis(motorized_TSF())
+Setup.add_supcomposition_on_axis(Motorized_TSF())
 L_TSF1 = Setup.optical_path_length()
 Setup.propagate(l2-115)
 Setup.add_on_axis(M2)
 Setup.propagate(145)
-Setup.add_on_axis(motorized_TSF())
+Setup.add_supcomposition_on_axis(Motorized_TSF())
 L_TSF2 = Setup.optical_path_length()
 Setup.propagate(l3-145)
 Setup.add_on_axis(CM)
@@ -111,14 +98,38 @@ Setup.add_on_axis(TFP2)
 Setup.propagate(620)
 L2 = Setup.optical_path_length() - L1
 
+Resonator_beams = Setup.compute_beams()
+TFP_beam_in = Resonator_beams[9]
+TFP_beam_out = Resonator_beams[12]
+radius, angle = TFP_beam_in.radius_angle()
+
+Input_beam = Beam(radius=radius, angle=angle, name="input beam")
+
+radius, angle = TFP_beam_out.radius_angle()
+Output_beam = Beam(radius=radius, angle=angle, name="output beam")
+Output_beam.set_geom(TFP_beam_out.get_geom())
+Output_beam.pos = TFP_beam_out.inner_ray().endpoint()
+
+Setup_in = Composition()
+Setup_in.pos = TFP_beam_in._pos
+Setup_in.set_geom(TFP_beam_in.get_geom())
+Setup_in.normal = TFP_beam_in.normal *-1
+Setup_in.set_light_source(Input_beam)
+Setup_in.propagate(100)
+Setup_in.add_on_axis(M1_in)
+Setup_in.propagate(100)
+
 
 if __name__ == "__main__":
     if freecad_da:
         clear_doc()
         Setup.draw()
+        Output_beam.draw()
+        Setup_in.draw()
         # setview()
     
     else:
+        # export_to_TikZ(Setup, filename=os.path.join(Folder, "Polaris_setup.tex"), draw_rays = True, scale=10)
         setup = OpticalSetup()
         # setup.add_element(Lens(f=2300))
         setup.add_element(FreeSpacePropagation(d=L1))
