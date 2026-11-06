@@ -13,18 +13,41 @@ from sympy import Matrix
 
 from LaserCAD.freecad_models import clear_doc, setview, freecad_da
 from LaserCAD.basic_optics import Mirror, Beam, Composition, Component, inch, Curved_Mirror, Ray, Geom_Object, export_to_TikZ
-from LaserCAD.basic_optics import Grating, Opt_Element, Post, Unit_Mount, Composed_Mount
+from LaserCAD.basic_optics import Grating, Opt_Element, Post, Unit_Mount, Composed_Mount, Lens, ThinBeamsplitter
 import matplotlib.pyplot as plt
 from LaserCAD.freecad_models.utils import thisfolder, load_STL
 from LaserCAD.non_interactings import Faraday_Isolator, Pockels_Cell, Lambda_Plate
 from LaserCAD.basic_optics.mirror import Newport_Mirror, Newport_Curved_Mirror
 from LaserCAD.basic_optics.mount import Adapter_1inch
-from LaserCAD.non_interactings.pockels_cell import Pockels_Cell
+from LaserCAD.non_interactings import Pockels_Cell, Faraday_Isolator, Iris
 from LaserCAD.moduls import Polarization_Rotator, Motorized_TSF
-from Geometrical_optics import CurvedMirror, Lens, FreeSpacePropagation, OpticalSetup, beam_radius_from_q
+from Geometrical_optics import CurvedMirror, FreeSpacePropagation, OpticalSetup, beam_radius_from_q
+from Geometrical_optics import Lens as Geometrical_Lens
   
 def dont():
     return None
+
+class Beamsplitter(ThinBeamsplitter):
+    def __init__(self, transmission=False, angle=0, name="Beamsplitter"):
+        super().__init__(name=name, transmission=transmission, angle_of_incidence=angle)
+        self.aperture = 25.4*1
+        self.set_mount(Composed_Mount(unit_model_list=["U100-A2K", "1inch_post"]))
+
+
+class Newport_Curved_Mirror(Curved_Mirror):
+    def __init__(self, name="Newport Mirror", aperture=inch, thickness=6, mirror=False, **kwargs):
+        super().__init__(name=name, aperture=aperture, thickness=thickness, **kwargs)
+        self.aperture = aperture
+        add_name = "_LH" if mirror else ""
+        if aperture == inch:
+            model = "U100-A2K"
+        elif aperture == 2*inch:
+            model = "U200-A2K"
+        elif aperture == 3*inch:
+            model = "U300-A2K"
+        self.set_mount(Composed_Mount(unit_model_list=[model+add_name, "1inch_post"]))
+        self.set_mount_back_mounted()
+
 
 Folder = os.path.dirname(os.path.abspath(__file__))
 beam = Beam(radius=1.5, angle=0.0002, wavelength=1.03e-3, name="main beam")
@@ -37,8 +60,11 @@ M1_angle = 87 - PM_angle
 M2_angle = 87 - CM_angle
 TFP_angle = 66
 
+faraday_isolator = Faraday_Isolator(name="Faraday Isolator", mount_name="faraday_isolator")
 pockels_cell = Pockels_Cell(name="Pockels Cell", mount_name="pockels_cell")
-Pol_Rotater = Polarization_Rotator(flip=True)
+Pol_Rotator1 = Polarization_Rotator(flip=True, name="Polarization Rotator Cavity")
+Pol_Rotator2 = Polarization_Rotator(flip=False, name="Polarization Rotator Input")
+
 
 # Prepare the setup
 radius = 10000
@@ -51,8 +77,20 @@ M2 = Newport_Mirror(phi = M2_angle, name="M2")
 CM = Newport_Curved_Mirror(phi = - 180 + CM_angle, radius=radius, name="CM")
 TFP1 = Newport_Mirror(phi = -180 + 2 * TFP_angle, aperture=2*inch, name="TFP1")
 TFP2 = Newport_Mirror(phi =  180 - 2 * TFP_angle, aperture=2*inch, name="TFP2")
+TL0 = Lens(f=500, name="Telescope Lens 0")
+TL1 = Lens(f=100, name="Telescope Lens 1")
+TL2 = Lens(f=200, name="Telescope Lens 2")
 
 M1_in = Newport_Mirror(phi = 270 - 2 * TFP_angle, name="M1_in")
+M2_in = Newport_Mirror(phi = 90, name="M2_in")
+M3_in = Newport_Mirror(phi = 90, name="M3_in")
+M4_in = Newport_Mirror(phi = -90, name="M4_in")
+
+M1_out = Newport_Mirror(phi = - 2 * TFP_angle, name="M1_out")
+M2_out = Beamsplitter(angle = -45, transmission=True, name="M2_out")
+M3_out = Beamsplitter(angle = 3, transmission=False, name="M3_out")
+M4_out = Newport_Mirror(phi = 186, name="M4_out")
+M5_out = Newport_Mirror(phi = -90, name="M5_out")
 
 l1 = 565
 l2 = 325 - 8.3
@@ -61,7 +99,7 @@ l4 = 660
 l5 = 540
 
 ## Make the setup
-Setup = Composition()
+Setup = Composition(name="A2 Resonator")
 Setup.pos = (0,0,140)
 Setup.set_light_source(beam)
 
@@ -85,7 +123,7 @@ Setup.propagate(l4)
 Setup.add_on_axis(TFP1)
 Setup.propagate(l5-400)
 
-Setup.add_supcomposition_on_axis(Pol_Rotater)
+Setup.add_supcomposition_on_axis(Pol_Rotator1)
 Setup.propagate(200)
 
 Setup.add_on_axis(pockels_cell)
@@ -100,38 +138,96 @@ L2 = Setup.optical_path_length() - L1
 
 Resonator_beams = Setup.compute_beams()
 TFP_beam_in = Resonator_beams[9]
-TFP_beam_out = Resonator_beams[12]
+TFP_beam_out = Resonator_beams[13]
 radius, angle = TFP_beam_in.radius_angle()
-
 Input_beam = Beam(radius=radius, angle=angle, name="input beam")
 
 radius, angle = TFP_beam_out.radius_angle()
 Output_beam = Beam(radius=radius, angle=angle, name="output beam")
-Output_beam.set_geom(TFP_beam_out.get_geom())
-Output_beam.pos = TFP_beam_out.inner_ray().endpoint()
 
-Setup_in = Composition()
+
+Setup_in = Composition(name="Setup_in")
 Setup_in.pos = TFP_beam_in._pos
 Setup_in.set_geom(TFP_beam_in.get_geom())
 Setup_in.normal = TFP_beam_in.normal *-1
 Setup_in.set_light_source(Input_beam)
-Setup_in.propagate(100)
+Setup_in.propagate(60)
 Setup_in.add_on_axis(M1_in)
-Setup_in.propagate(100)
+Setup_in.propagate(248)
+Setup_in.add_on_axis(Iris(name="A2 shutter in"))
+Setup_in.propagate(30)
+Setup_in.add_on_axis(faraday_isolator)
+Setup_in.propagate(75+52)
+Setup_in.add_on_axis(TL0) 
+Setup_in.propagate(84)
+Setup_in.add_on_axis(M2_in)
+Setup_in.propagate(210)
+Setup_in.add_on_axis(TL1) 
+Setup_in.propagate(TL1.focal_length + TL2.focal_length)
+Setup_in.add_on_axis(TL2)
+Setup_in.propagate(290)
+Setup_in.add_on_axis(M3_in)
+Setup_in.propagate(104)
+Setup_in.add_supcomposition_on_axis(Pol_Rotator2)
+Setup_in.propagate(80)
+Setup_in.add_on_axis(M4_in)
 
+# Setup out
+
+Setup_out = Composition(name="Setup_out")
+Setup_out.pos = TFP_beam_out._pos
+Setup_out.set_geom(Resonator_beams[13].get_geom())
+Setup_out.normal = Resonator_beams[12].normal 
+Setup_out.set_light_source(Output_beam)
+Setup_out.propagate(100)
+Setup_out.add_on_axis(M1_out)
+Setup_out.propagate(600)
+Setup_out.add_on_axis(M2_out)
+Setup_out.propagate(200)
+Setup_out.add_on_axis(M3_out)
+Setup_out.propagate(800)
+Setup_out.add_on_axis(M4_out)
+Setup_out.propagate(200)
+
+# Energy_head
+Setup_out.compute_beams()
+
+Lens_energy = Lens(f=-30, name="Energy head lens")
+arm2_lightsource = M2_out._alternative_beam
+Setup_Energy = Composition(name="Energy head")
+Setup_Energy.set_geom(arm2_lightsource.get_geom())
+Setup_Energy.set_light_source(arm2_lightsource) 
+Setup_Energy.propagate(100)
+Setup_Energy.add_on_axis(Lens_energy)
+Setup_Energy.propagate(100)
+
+# Spectrometer 
+
+Lens_spectrometer = Lens(f=75, name="Energy head lens")
+arm3_lightsource = M3_out._alternative_beam
+Setup_Spectrometer = Composition(name="Spectrometer")
+Setup_Spectrometer.set_geom(arm3_lightsource.get_geom())
+Setup_Spectrometer.set_light_source(arm3_lightsource)
+Setup_Spectrometer.propagate(100)
+Setup_Spectrometer.add_on_axis(M5_out)
+Setup_Spectrometer.propagate(100)
+Setup_Spectrometer.add_on_axis(Lens_spectrometer)
+Setup_Spectrometer.propagate(70)
 
 if __name__ == "__main__":
     if freecad_da:
         clear_doc()
         Setup.draw()
-        Output_beam.draw()
         Setup_in.draw()
+        Setup_out.draw()
+        Setup_Energy.draw()
+        Setup_Spectrometer.draw()
         # setview()
     
     else:
-        # export_to_TikZ(Setup, filename=os.path.join(Folder, "Polaris_setup.tex"), draw_rays = True, scale=10)
+        # export_to_TikZ(Setup_out, filename=os.path.join(Folder, "Polaris_setup.tex"), draw_rays = True, scale=10)
         setup = OpticalSetup()
-        # setup.add_element(Lens(f=2300))
+        # setup.add_element(Geometrical_Lens(f=2300))
         setup.add_element(FreeSpacePropagation(d=L1))
         setup.add_element(CurvedMirror(R=radius))
         setup.add_element(FreeSpacePropagation(d=L2))
