@@ -13,16 +13,17 @@ from sympy import Matrix
 
 from LaserCAD.freecad_models import clear_doc, setview, freecad_da
 from LaserCAD.basic_optics import Mirror, Beam, Composition, Component, inch, Curved_Mirror, Ray, Geom_Object, export_to_TikZ
-from LaserCAD.basic_optics import Grating, Opt_Element, Post, Unit_Mount, Composed_Mount, Lens, ThinBeamsplitter
+from LaserCAD.basic_optics import Grating, Opt_Element, Post, Unit_Mount, Composed_Mount, Lens, ThinBeamsplitter, Ray_Distribution
 import matplotlib.pyplot as plt
 from LaserCAD.freecad_models.utils import thisfolder, load_STL
-from LaserCAD.non_interactings import Faraday_Isolator, Pockels_Cell, Lambda_Plate
+from LaserCAD.non_interactings import Faraday_Isolator, Pockels_Cell, Lambda_Plate, Spectrometer, Detector
 from LaserCAD.basic_optics.mirror import Newport_Mirror, Newport_Curved_Mirror
 from LaserCAD.basic_optics.mount import Adapter_1inch
 from LaserCAD.non_interactings import Pockels_Cell, Faraday_Isolator, Iris
 from LaserCAD.moduls import Polarization_Rotator, Motorized_TSF
 from Geometrical_optics import CurvedMirror, FreeSpacePropagation, OpticalSetup, beam_radius_from_q
 from Geometrical_optics import Lens as Geometrical_Lens
+from LaserCAD.non_interactings.crystal import Crystal_with_mount
   
 def dont():
     return None
@@ -48,6 +49,10 @@ class Newport_Curved_Mirror(Curved_Mirror):
         self.set_mount(Composed_Mount(unit_model_list=[model+add_name, "1inch_post"]))
         self.set_mount_back_mounted()
 
+class Pump_beam(Ray_Distribution):
+    def __init__(self, radius=1, angle=1.9*2.08*np.pi/180, wavelength=940E-6, steps=3):
+        super().__init__(radius=radius, angle=angle, wavelength=wavelength, steps=steps)
+        self.draw_dict["color"] = (255/256,255/256,0.0)
 
 Folder = os.path.dirname(os.path.abspath(__file__))
 beam = Beam(radius=1.5, angle=0.0002, wavelength=1.03e-3, name="main beam")
@@ -64,7 +69,7 @@ faraday_isolator = Faraday_Isolator(name="Faraday Isolator", mount_name="faraday
 pockels_cell = Pockels_Cell(name="Pockels Cell", mount_name="pockels_cell")
 Pol_Rotator1 = Polarization_Rotator(flip=True, name="Polarization Rotator Cavity")
 Pol_Rotator2 = Polarization_Rotator(flip=False, name="Polarization Rotator Input")
-
+Laser_crystal = Crystal_with_mount(name="Laser crystal", stl_file="Kuehlmount_Alumosilikatglas_d23.stl", thickness=12, flip=True)
 
 # Prepare the setup
 radius = 10000
@@ -92,6 +97,10 @@ M3_out = Beamsplitter(angle = 3, transmission=False, name="M3_out")
 M4_out = Newport_Mirror(phi = 186, name="M4_out")
 M5_out = Newport_Mirror(phi = -90, name="M5_out")
 
+PumpL1 = Lens(f=100, aperture=2*inch, name="Pump lens 1")  # f????
+PumpL2 = Lens(f=1000, aperture=2*inch, name="Pump lens 2")  # f????
+PumpL3 = Lens(f=1000, aperture=2*inch, name="Pump lens 3")  # f????
+
 l1 = 565
 l2 = 325 - 8.3
 l3 = 1060
@@ -106,7 +115,9 @@ Setup.set_light_source(beam)
 # We start at the position of the Glan_in
 # Setup.propagate(100)
 Setup.add_on_axis(PM)
-Setup.propagate(l1)
+Setup.propagate(25)
+Setup.add_supcomposition_on_axis(Laser_crystal)
+Setup.propagate(l1-25)
 Setup.add_on_axis(M1)
 Setup.propagate(115)
 Setup.add_supcomposition_on_axis(Motorized_TSF())
@@ -200,6 +211,7 @@ Setup_Energy.set_light_source(arm2_lightsource)
 Setup_Energy.propagate(100)
 Setup_Energy.add_on_axis(Lens_energy)
 Setup_Energy.propagate(100)
+Setup_Energy.add_on_axis(Detector(name="Energy head detector"))
 
 # Spectrometer 
 
@@ -213,6 +225,29 @@ Setup_Spectrometer.add_on_axis(M5_out)
 Setup_Spectrometer.propagate(100)
 Setup_Spectrometer.add_on_axis(Lens_spectrometer)
 Setup_Spectrometer.propagate(70)
+Setup_Spectrometer.add_on_axis(Spectrometer(name="Spectrometer", model="SR"))
+
+# Pump optics 
+
+Setup_pump = Composition(name="Pump optics")
+pump_beam = Pump_beam()
+
+laser_diode_stack = Component(name="Laser diode stack")
+laser_diode_stack.draw_dict["stl_file"]= rf"{thisfolder}\misc_meshes\Jenoptik_Laserdiodenstack.stl"
+laser_diode_stack.freecad_model = load_STL
+Setup_pump.set_geom(Laser_crystal.get_geom())
+# pump_beam.normal *= -1
+Setup_pump.normal *= -1
+Setup_pump.set_light_source(pump_beam)
+Setup_pump.propagate(25+42)
+Setup_pump.add_on_axis(PumpL1)
+Setup_pump.propagate(64)
+Setup_pump.add_on_axis(PumpL2)
+Setup_pump.propagate(54)
+Setup_pump.add_on_axis(PumpL3)
+Setup_pump.propagate(158-170/2)
+Setup_pump.add_on_axis(laser_diode_stack)
+
 
 if __name__ == "__main__":
     if freecad_da:
@@ -222,7 +257,8 @@ if __name__ == "__main__":
         Setup_out.draw()
         Setup_Energy.draw()
         Setup_Spectrometer.draw()
-        # setview()
+        Setup_pump.draw()
+        setview()
     
     else:
         # export_to_TikZ(Setup_out, filename=os.path.join(Folder, "Polaris_setup.tex"), draw_rays = True, scale=10)
